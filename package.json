@@ -1,0 +1,30 @@
+{
+  "name": "folium",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "@tiptap/react": "2.4.0",
+    "@tiptap/pm": "2.6.0",
+    "@tiptap/starter-kit": "2.4.0",
+    "@tiptap/extension-underline": "2.4.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "@types/node": "20.14.9",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0"
+  }
+}

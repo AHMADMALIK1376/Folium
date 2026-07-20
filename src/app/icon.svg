@@ -1,0 +1,7 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Folium logo">
+  <rect width="64" height="64" rx="14" fill="#FFFFFF"/>
+  <path d="M32,9 C48,9 55,24 55,32 C55,40 48,55 32,55 C16,55 9,40 9,32 C9,24 16,9 32,9 Z" fill="#D41F26"/>
+  <path d="M32,13 C32,13 32,32 32,51" stroke="#95D9CD" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M32,24 C38,24 43,27 46,32 C43,29 38,27 32,27 Z" fill="#95D9CD"/>
+  <path d="M32,38 C26,38 21,41 18,32 C21,35 26,38 32,38 Z" fill="#95D9CD" opacity="0.85"/>
+</svg>

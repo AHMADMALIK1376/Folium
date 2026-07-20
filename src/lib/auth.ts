@@ -8,14 +8,15 @@ import type { User } from "./types.ts";
 
 export const SESSION_COOKIE = "docsapp_uid";
 
-export function getCurrentUser(): User | null {
-  const uid = cookies().get(SESSION_COOKIE)?.value;
+export async function getCurrentUser(): Promise<User | null> {
+  const store = await cookies();
+  const uid = store.get(SESSION_COOKIE)?.value;
   if (!uid) return null;
   return getUserById(uid) ?? null;
 }
 
-export function requireUser(): User {
-  const user = getCurrentUser();
+export async function requireUser(): Promise<User> {
+  const user = await getCurrentUser();
   if (!user) throw new AuthError("Not authenticated");
   return user;
 }

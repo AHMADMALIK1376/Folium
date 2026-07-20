@@ -7,7 +7,7 @@ const MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
 const ALLOWED_EXTENSIONS = [".txt", ".md", ".markdown"];
 
 export async function POST(req: NextRequest) {
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   let formData: FormData;

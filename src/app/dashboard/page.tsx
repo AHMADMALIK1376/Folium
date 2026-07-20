@@ -5,8 +5,8 @@ import { DashboardActions } from "@/components/DashboardActions";
 import { TopBar } from "@/components/TopBar";
 import { DocumentCard } from "@/components/DocumentCard";
 
-export default function DashboardPage() {
-  const user = getCurrentUser();
+export default async function DashboardPage() {
+  const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const { owned, shared } = listDocumentsForUser(user.id);

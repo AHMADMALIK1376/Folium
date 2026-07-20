@@ -29,6 +29,29 @@ function createConnection(): DatabaseSync {
 export const db: DatabaseSync = globalForDb.__docsapp_db ?? createConnection();
 if (!globalForDb.__docsapp_db) globalForDb.__docsapp_db = db;
 
+// node:sqlite's StatementSync.get()/.all() return rows as null-prototype
+// objects. That's fine for internal use, but Next.js's Server->Client
+// Component serialization explicitly rejects null-prototype objects
+// ("Only plain objects... can be passed to Client Components"). Since
+// these rows eventually flow into client components (TopBar, DocumentCard,
+// etc.), normalize every row to a plain object right at the source instead
+// of patching every call site.
+function toPlainObject<T>(row: T): T {
+  if (row && typeof row === "object") return { ...(row as object) } as T;
+  return row;
+}
+
+const rawPrepare = db.prepare.bind(db);
+db.prepare = ((sql: string) => {
+  const stmt = rawPrepare(sql);
+  const rawGet = stmt.get.bind(stmt);
+  const rawAll = stmt.all.bind(stmt);
+  stmt.get = ((...args: unknown[]) => toPlainObject(rawGet(...args))) as typeof stmt.get;
+  stmt.all = ((...args: unknown[]) =>
+    (rawAll(...args) as unknown[]).map(toPlainObject)) as typeof stmt.all;
+  return stmt;
+}) as typeof db.prepare;
+
 export function newId(prefix: string): string {
   return `${prefix}_${crypto.randomBytes(9).toString("base64url")}`;
 }

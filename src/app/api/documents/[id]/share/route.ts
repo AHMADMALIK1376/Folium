@@ -8,11 +8,14 @@ import {
 } from "@/lib/repo";
 import { shareDocumentSchema } from "@/lib/validation";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const me = getCurrentUser();
+type RouteParams = { params: Promise<{ id: string }> };
+
+export async function POST(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const doc = getDocumentWithMeta(params.id, me.id);
+  const doc = getDocumentWithMeta(id, me.id);
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
   if (!doc.is_owner) {
     return NextResponse.json(
@@ -47,16 +50,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "You already own this document" }, { status: 400 });
   }
 
-  shareDocument(params.id, target.id);
-  const updated = getDocumentWithMeta(params.id, me.id);
+  shareDocument(id, target.id);
+  const updated = getDocumentWithMeta(id, me.id);
   return NextResponse.json({ document: updated }, { status: 201 });
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const me = getCurrentUser();
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const doc = getDocumentWithMeta(params.id, me.id);
+  const doc = getDocumentWithMeta(id, me.id);
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
   if (!doc.is_owner) {
     return NextResponse.json(
@@ -68,7 +72,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ error: "Missing userId" }, { status: 400 });
 
-  unshareDocument(params.id, userId);
-  const updated = getDocumentWithMeta(params.id, me.id);
+  unshareDocument(id, userId);
+  const updated = getDocumentWithMeta(id, me.id);
   return NextResponse.json({ document: updated });
 }

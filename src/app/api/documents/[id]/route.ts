@@ -3,20 +3,24 @@ import { getCurrentUser } from "@/lib/auth";
 import { deleteDocument, getDocumentWithMeta, updateDocument } from "@/lib/repo";
 import { updateDocumentSchema } from "@/lib/validation";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const me = getCurrentUser();
+type RouteParams = { params: Promise<{ id: string }> };
+
+export async function GET(_req: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const doc = getDocumentWithMeta(params.id, me.id);
+  const doc = getDocumentWithMeta(id, me.id);
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
   return NextResponse.json({ document: doc });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const me = getCurrentUser();
+export async function PATCH(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const existing = getDocumentWithMeta(params.id, me.id);
+  const existing = getDocumentWithMeta(id, me.id);
   if (!existing) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
   let body: unknown;
@@ -34,15 +38,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     );
   }
 
-  const updated = updateDocument(params.id, parsed.data);
+  const updated = updateDocument(id, parsed.data);
   return NextResponse.json({ document: updated });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const me = getCurrentUser();
+export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+  const { id } = await params;
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const existing = getDocumentWithMeta(params.id, me.id);
+  const existing = getDocumentWithMeta(id, me.id);
   if (!existing) return NextResponse.json({ error: "Document not found" }, { status: 404 });
   if (!existing.is_owner) {
     return NextResponse.json(
@@ -51,6 +56,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     );
   }
 
-  deleteDocument(params.id);
+  deleteDocument(id);
   return NextResponse.json({ ok: true });
 }

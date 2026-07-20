@@ -4,14 +4,14 @@ import { createDocument, listDocumentsForUser } from "@/lib/repo";
 import { createDocumentSchema } from "@/lib/validation";
 
 export async function GET() {
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   const { owned, shared } = listDocumentsForUser(me.id);
   return NextResponse.json({ owned, shared });
 }
 
 export async function POST(req: NextRequest) {
-  const me = getCurrentUser();
+  const me = await getCurrentUser();
   if (!me) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   let body: unknown = {};

@@ -3,8 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAllUsers } from "@/lib/repo";
 import { LoginOptions } from "@/components/LoginOptions";
 
-export default function LoginPage() {
-  const existing = getCurrentUser();
+export default async function LoginPage() {
+  const existing = await getCurrentUser();
   if (existing) redirect("/dashboard");
 
   const users = getAllUsers().map((u) => ({ id: u.id, name: u.name, email: u.email }));

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Single Next.js 14 (App Router) app doing double duty as frontend and backend: React Server/Client Components for UI, API routes for the REST-ish surface, `node:sqlite` for persistence. One deployable unit, one process, one database file. For a 4-6 hour scope with one reviewer testing it, that's the simplest architecture that still demonstrates real full-stack judgment (schema design, access control, validation, API design) without the overhead of a separate backend service.
+Single Next.js 15 (App Router) app doing double duty as frontend and backend: React Server/Client Components for UI, API routes for the REST-ish surface, `node:sqlite` for persistence. One deployable unit, one process, one database file. For a 4-6 hour scope with one reviewer testing it, that's the simplest architecture that still demonstrates real full-stack judgment (schema design, access control, validation, API design) without the overhead of a separate backend service.
 
 ## What I prioritized, and why
 
@@ -35,6 +35,12 @@ The tradeoff: no Prisma Studio, no auto-generated migrations, and `node:sqlite` 
 ## Deployment note (also see `DEPLOY.md`)
 
 Because persistence is a single SQLite file on local disk, this app needs a **long-running process with a writable local filesystem** — not a serverless/edge platform. Serverless platforms (Vercel's default deployment model, for example) run each request in an ephemeral or non-shared filesystem, so a local SQLite file would not reliably persist across requests or concurrent invocations. I deployed instead to a platform that runs the app as a persistent Node process (see `DEPLOY.md` for the exact steps and reasoning). This is the kind of infrastructure tradeoff the assignment specifically asks candidates to reason about explicitly, so I wanted to call it out rather than let it be implicit.
+
+## Post-build security patch: Next.js 14 → 15
+
+The project was originally built on Next.js 14.2.5. After a first local `npm install` on a clean machine, npm flagged that version as having a known vulnerability. I looked into it: Next.js had backported a fix for one CVE to 14.2.35, but a separate high-severity denial-of-service issue in Server Components (CVE-2025-55184, fully fixed under CVE-2025-67779) was never backported to the 14.x line at all — it's only fixed from Next.js 15.0.7 onward. Since this app uses the App Router with Server Components throughout, that issue applies directly, not just in theory.
+
+Given that, I upgraded to Next.js 15.5.20 rather than settling for the incomplete 14.2.35 patch. That required a small, mechanical migration: Next 15 made `cookies()` and dynamic route `params` asynchronous, so `src/lib/auth.ts` and every API route/page reading a route param needed an `await` added. No behavioral changes, no new bugs — re-verified with a clean type check, the full test suite, and a full production build plus an end-to-end API smoke test afterward. This is the kind of "AI-assisted, not AI-blind" verification loop called out in `AI_WORKFLOW.md`: I didn't take the upgrade on faith, I re-ran everything that had passed before.
 
 ## What I'd build next with another 2-4 hours
 

@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unknown user" }, { status: 404 });
   }
 
-  cookies().set(SESSION_COOKIE, user.id, {
+  const store = await cookies();
+  store.set(SESSION_COOKIE, user.id, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",

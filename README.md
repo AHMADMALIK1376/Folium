@@ -15,7 +15,7 @@ Live demo: see `SUBMISSION.md` for the deployed URL and seeded test accounts.
 
 ## Tech stack
 
-- **Next.js 14** (App Router) + **TypeScript**, single full-stack app (frontend + API routes together).
+- **Next.js 15** (App Router) + **TypeScript**, single full-stack app (frontend + API routes together).
 - **`node:sqlite`** (Node's built-in SQLite module) for persistence — no ORM, no external database service, no separate driver dependency. See `ARCHITECTURE.md` for why.
 - **TipTap** for the rich-text editor.
 - **Zod** for request validation.

@@ -2,5 +2,7 @@ node_modules/
 .next/
 data/*.sqlite
 data/*.sqlite-journal
+data/*.sqlite-wal
+data/*.sqlite-shm
 .env*.local
 *.log

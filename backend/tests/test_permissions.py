@@ -48,3 +48,17 @@ def test_can_view_for_every_granted_level():
     assert can_view(Permission.COMMENT) is True
     assert can_view(Permission.VIEW) is True
     assert can_view(None) is False
+
+
+def test_stored_owner_string_does_not_escalate_shared_user():
+    """A stored 'owner' permission string must never promote a shared user to owner."""
+    assert resolve_permission(OWNER, SHARED, {SHARED: "owner"}) is None
+
+
+def test_empty_permission_string_is_denied():
+    assert resolve_permission(OWNER, SHARED, {SHARED: ""}) is None
+
+
+def test_permission_matching_is_case_sensitive():
+    """Only exact lowercase permission values grant access; 'Edit' ≠ 'edit'."""
+    assert resolve_permission(OWNER, SHARED, {SHARED: "Edit"}) is None

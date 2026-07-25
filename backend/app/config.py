@@ -5,7 +5,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+asyncpg://folium:folium@localhost:5433/folium"
-    environment: str = "development"
+    # Must stay "production" so an unset ENVIRONMENT fails closed instead of
+    # silently enabling the dev-only unauthenticated header auth bypass.
+    environment: str = "production"
     frontend_origin: str = "http://localhost:3000"
 
     @property

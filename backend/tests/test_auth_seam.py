@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
-from app.config import settings
+from app.config import Settings, settings
 
 
 async def test_missing_header_is_unauthorized(client: AsyncClient):
@@ -26,3 +26,10 @@ async def test_dev_header_is_rejected_outside_development(client: AsyncClient, m
     monkeypatch.setattr(settings, "environment", "production")
     response = await client.get("/api/v1/me", headers={"X-Dev-User-Email": "a@example.com"})
     assert response.status_code == 401
+
+
+def test_unset_environment_defaults_to_production(monkeypatch):
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    fresh_settings = Settings(_env_file=None)
+    assert fresh_settings.environment == "production"
+    assert fresh_settings.is_development is False

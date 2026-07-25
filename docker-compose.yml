@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: folium
+      POSTGRES_PASSWORD: folium
+      POSTGRES_DB: folium
+    ports:
+      - "5433:5432"
+    volumes:
+      - folium_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U folium"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  folium_pgdata:

@@ -220,7 +220,7 @@ authentication. All data access is mediated by FastAPI, keeping every permission
 ```sql
 users
   id            uuid PK                    -- same id as the Supabase auth user
-  email         citext UNIQUE NOT NULL
+  email         varchar(320) UNIQUE NOT NULL   -- lowercased by the application layer
   display_name  text NOT NULL
   avatar_url    text
   created_at    timestamptz NOT NULL DEFAULT now()

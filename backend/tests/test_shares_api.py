@@ -14,6 +14,11 @@ def bob_email() -> str:
     return f"bob-{uuid.uuid4()}@example.com"
 
 
+@pytest.fixture
+def carol_email() -> str:
+    return f"carol-{uuid.uuid4()}@example.com"
+
+
 def headers(email: str) -> dict[str, str]:
     return {"X-Dev-User-Email": email}
 
@@ -147,3 +152,89 @@ async def test_unshare_revokes_access(client: AsyncClient, alice_email, bob_emai
 
     denied = await client.get(f"/api/v1/documents/{doc_id}", headers=headers(bob_email))
     assert denied.status_code == 404
+
+
+async def test_editor_cannot_reshare_document(
+    client: AsyncClient, alice_email, bob_email, carol_email
+):
+    await ensure_user(client, bob_email)
+    await ensure_user(client, carol_email)
+    doc_id = await make_doc(client, alice_email)
+    await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": bob_email, "permission": "edit"},
+        headers=headers(alice_email),
+    )
+
+    response = await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": carol_email, "permission": "edit"},
+        headers=headers(bob_email),
+    )
+    assert response.status_code == 404
+
+    listing = await client.get("/api/v1/documents", headers=headers(carol_email))
+    assert listing.json()["shared"] == []
+
+
+async def test_editor_cannot_change_another_users_permission(
+    client: AsyncClient, alice_email, bob_email, carol_email
+):
+    await ensure_user(client, bob_email)
+    await ensure_user(client, carol_email)
+    doc_id = await make_doc(client, alice_email)
+    await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": bob_email, "permission": "edit"},
+        headers=headers(alice_email),
+    )
+    share = await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": carol_email, "permission": "view"},
+        headers=headers(alice_email),
+    )
+    carol_id = share.json()["user_id"]
+
+    response = await client.patch(
+        f"/api/v1/documents/{doc_id}/shares/{carol_id}",
+        json={"permission": "edit"},
+        headers=headers(bob_email),
+    )
+    assert response.status_code == 404
+
+    shares = await client.get(
+        f"/api/v1/documents/{doc_id}/shares", headers=headers(alice_email)
+    )
+    carol_share = [s for s in shares.json() if s["user_id"] == carol_id][0]
+    assert carol_share["permission"] == "view"
+
+
+async def test_editor_cannot_revoke_another_users_access(
+    client: AsyncClient, alice_email, bob_email, carol_email
+):
+    await ensure_user(client, bob_email)
+    await ensure_user(client, carol_email)
+    doc_id = await make_doc(client, alice_email)
+    await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": bob_email, "permission": "edit"},
+        headers=headers(alice_email),
+    )
+    share = await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": carol_email, "permission": "view"},
+        headers=headers(alice_email),
+    )
+    carol_id = share.json()["user_id"]
+
+    response = await client.delete(
+        f"/api/v1/documents/{doc_id}/shares/{carol_id}",
+        headers=headers(bob_email),
+    )
+    assert response.status_code == 404
+
+    shares = await client.get(
+        f"/api/v1/documents/{doc_id}/shares", headers=headers(alice_email)
+    )
+    carol_ids = [s["user_id"] for s in shares.json()]
+    assert carol_id in carol_ids

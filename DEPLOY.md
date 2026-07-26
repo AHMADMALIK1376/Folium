@@ -104,7 +104,7 @@ Step 5 is the important one: it is the test that protects real users' private do
 
 ## Why not Vercel
 
-v1 persists documents to a local SQLite file (`data/app.sqlite`) via `node:sqlite`. That requires a
+v1 persists documents to a local SQLite file (`frontend/data/app.sqlite`) via `node:sqlite`. That requires a
 **long-running process with a writable, persistent local disk**. Vercel's default model runs Next.js
 API routes as ephemeral serverless functions with no shared filesystem across invocations, so a local
 SQLite file would not reliably survive between requests.
@@ -116,29 +116,34 @@ network service.
 
 1. Push the project to a GitHub repository.
 2. https://railway.app → **New Project** → **Deploy from GitHub repo** → select the repo.
-3. Railway auto-detects Node. No environment variables are required.
-4. Under **Settings**, confirm:
+3. Set the service's **Root Directory** to `frontend`, so Railway builds and runs the Next.js app
+   instead of the repo root (Part 1 does the same for the v2 services).
+4. Railway auto-detects Node. No environment variables are required.
+5. Under **Settings**, confirm:
    - **Build command:** `npm install && npm run build`
    - **Start command:** `npm run start`
    - **Node version:** 22.x — Railway reads `engines.node` from `package.json`, already set to
      `>=22.5.0`. Set it explicitly under Settings → Environment if it isn't picked up.
-5. Deploy. Railway provisions a persistent disk by default, surviving restarts within the same
-   deployment. A fresh deploy resets `data/`, which is expected for a demo — the app auto-seeds.
-6. Open the generated `*.up.railway.app` URL.
+6. Deploy. Railway provisions a persistent disk by default, surviving restarts within the same
+   deployment. A fresh deploy resets `frontend/data/`, which is expected for a demo — the app
+   auto-seeds.
+7. Open the generated `*.up.railway.app` URL.
 
 ## Option B: Render
 
 1. Push the project to a GitHub repository.
 2. https://render.com → **New** → **Web Service** → connect the repo.
-3. Configure:
+3. Set **Root Directory** to `frontend`, so build and start commands run inside the Next.js app
+   (Part 1 does the same for the v2 services).
+4. Configure:
    - **Runtime:** Node
    - **Build command:** `npm install && npm run build`
    - **Start command:** `npm run start`
    - **Node version:** set `NODE_VERSION=22.5.0` or newer, or rely on `engines` in `package.json`.
-4. On the free tier the local disk persists only for the lifetime of the running instance — a redeploy
-   or a spin-down resets `data/app.sqlite`, and the app re-seeds on next boot. For persistence across
-   redeploys, attach a **Render Disk** (paid) mounted at `/opt/render/project/src/data`.
-5. Deploy and open the generated `*.onrender.com` URL.
+5. On the free tier the local disk persists only for the lifetime of the running instance — a redeploy
+   or a spin-down resets `frontend/data/app.sqlite`, and the app re-seeds on next boot. For persistence
+   across redeploys, attach a **Render Disk** (paid) mounted at `/opt/render/project/src/frontend/data`.
+6. Deploy and open the generated `*.onrender.com` URL.
 
 ## Verifying a v1 deployment
 
@@ -153,14 +158,15 @@ version older than 22.5, which `node:sqlite` requires.
 
 ## Local Docker alternative
 
-Any host that can run a persistent Node 22+ container works:
+Any host that can run a persistent Node 22+ container works. Build from the repo root, copying from
+`frontend/` so the image only contains the Next.js app:
 
 ```dockerfile
 FROM node:22-slim
 WORKDIR /app
-COPY package*.json ./
+COPY frontend/package*.json ./
 RUN npm install
-COPY . .
+COPY frontend/ .
 RUN npm run build
 EXPOSE 3000
 CMD ["npm", "run", "start"]

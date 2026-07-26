@@ -69,6 +69,17 @@ async def test_update_title_and_content(client: AsyncClient, alice):
     assert response.json()["content"] == new_content
 
 
+async def test_update_rejects_non_tiptap_content(client: AsyncClient, alice):
+    created = await client.post("/api/v1/documents", json={"title": "Draft"}, headers=alice)
+    doc_id = created.json()["id"]
+    response = await client.patch(
+        f"/api/v1/documents/{doc_id}",
+        json={"content": {"not": "tiptap"}},
+        headers=alice,
+    )
+    assert response.status_code == 422
+
+
 async def test_stranger_cannot_update(client: AsyncClient, alice, bob):
     created = await client.post("/api/v1/documents", json={"title": "Mine"}, headers=alice)
     doc_id = created.json()["id"]

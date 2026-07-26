@@ -137,17 +137,38 @@ def title_from_filename(filename: str) -> str:
 
 
 def doc_to_plain_text(doc: dict[str, Any]) -> str:
-    """Flatten a TipTap document to plain text, one line per block node."""
+    """Flatten a TipTap document to plain text, one line per block node.
+
+    Defensive against malformed shapes (non-dict nodes, non-list `content`)
+    even though the schema layer validates content first — belt-and-braces
+    so this can never raise on unexpected input.
+    """
     lines: list[str] = []
 
     def walk(node: dict[str, Any]) -> str:
+        if not isinstance(node, dict):
+            return ""
         if node.get("type") == "text":
             return node.get("text", "")
-        return "".join(walk(child) for child in node.get("content", []))
+        content = node.get("content")
+        if not isinstance(content, list):
+            return ""
+        return "".join(walk(child) for child in content)
 
-    for block in doc.get("content", []):
+    block_content = doc.get("content")
+    if not isinstance(block_content, list):
+        block_content = []
+
+    for block in block_content:
+        if not isinstance(block, dict):
+            continue
         if block.get("type") in ("bulletList", "orderedList"):
-            for item in block.get("content", []):
+            item_content = block.get("content")
+            if not isinstance(item_content, list):
+                item_content = []
+            for item in item_content:
+                if not isinstance(item, dict):
+                    continue
                 text = walk(item).strip()
                 if text:
                     lines.append(text)

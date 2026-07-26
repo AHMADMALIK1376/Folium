@@ -7,6 +7,43 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.user import UserOut
 
 
+def _validate_tiptap_doc(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Reject content that is not a TipTap document.
+
+    Content is stored as jsonb and consumed by the editor and, later, the
+    collaboration service. Accepting arbitrary JSON here would let malformed
+    documents reach both.
+    """
+    if value is None:
+        return None
+
+    def _check_node(node: Any) -> None:
+        if not isinstance(node, dict) or not isinstance(node.get("type"), str):
+            # ValueError (not TypeError) is required here: pydantic's field_validator
+            # only converts ValueError/AssertionError into a ValidationError.
+            raise ValueError(  # noqa: TRY004
+                "each TipTap node must be an object with a string 'type'"
+            )
+        content = node.get("content")
+        if content is not None:
+            if not isinstance(content, list):
+                raise ValueError("TipTap node 'content' must be a list")
+            for child in content:
+                _check_node(child)
+
+    if not isinstance(value, dict) or value.get("type") != "doc":
+        raise ValueError("content must be a TipTap document with type 'doc'")
+
+    content = value.get("content")
+    if content is not None:
+        if not isinstance(content, list):
+            raise ValueError("content must be a list of TipTap nodes")
+        for node in content:
+            _check_node(node)
+
+    return value
+
+
 class DocumentCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     content: dict[str, Any] | None = None
@@ -18,6 +55,11 @@ class DocumentCreate(BaseModel):
         if not cleaned:
             raise ValueError("title must not be blank")
         return cleaned
+
+    @field_validator("content")
+    @classmethod
+    def content_is_tiptap_doc(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return _validate_tiptap_doc(v)
 
 
 class DocumentUpdate(BaseModel):
@@ -33,6 +75,11 @@ class DocumentUpdate(BaseModel):
         if not cleaned:
             raise ValueError("title must not be blank")
         return cleaned
+
+    @field_validator("content")
+    @classmethod
+    def content_is_tiptap_doc(cls, v: dict[str, Any] | None) -> dict[str, Any] | None:
+        return _validate_tiptap_doc(v)
 
 
 class DocumentSummary(BaseModel):

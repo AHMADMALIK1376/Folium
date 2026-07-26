@@ -3,11 +3,14 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: rebuilding for production.**
+> **Status: rebuilding for production — Phase 1 implemented.**
 > Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
-> The code currently in this repository is **v1** (a single Next.js app with local SQLite and mocked
-> auth). The v2 architecture is designed and approved but **not yet implemented** — see
-> [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md).
+> **Phase 1 of the v2 rebuild is implemented**: a separated `frontend/` (Next.js) and `backend/`
+> (FastAPI) with PostgreSQL, SQLAlchemy + Alembic, document/sharing/import APIs, and CI. Authentication
+> is still a development-only stand-in (an email header, no passwords or sessions) — real auth,
+> real-time collaboration, and version history remain upcoming phases. See
+> [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) and the
+> [Phase 1 implementation plan](docs/superpowers/plans/2026-07-25-phase-1-foundation.md).
 
 ---
 
@@ -116,15 +119,27 @@ server.
 ## Repository layout
 
 ```
-src/                    v1 application source (Next.js)
-  app/                    pages + API routes
-  components/             React components
-  lib/                    db, repo, auth, validation, file import
-test/                   v1 test suite
-data/                   SQLite database file (gitignored)
+frontend/               Next.js application (v1 today, v2 UI going forward)
+  src/app/                 pages + API routes
+  src/components/          React components
+  src/lib/                 db, repo, auth, validation, file import
+  test/                    frontend test suite
+backend/                FastAPI application (v2)
+  app/api/                 route handlers
+  app/core/                exceptions, constants
+  app/db/                  session, base
+  app/models/              SQLAlchemy models
+  app/schemas/             pydantic request/response schemas
+  app/services/            business logic
+  app/utils/               file import, conversions
+  alembic/                 database migrations
+  tests/                   backend test suite
 docs/
   superpowers/specs/      design specs for the v2 rebuild
+  superpowers/plans/      implementation plans for the v2 rebuild
   archive/                original interview submission artifacts
+.github/workflows/      CI pipelines
+docker-compose.yml      local PostgreSQL for development
 ARCHITECTURE.md         architecture, v1 and v2
 DEPLOY.md               deployment guide
 ```

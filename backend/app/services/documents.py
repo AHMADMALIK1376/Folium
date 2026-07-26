@@ -8,7 +8,7 @@ from app.core.constants import empty_doc
 from app.core.exceptions import NotFoundError
 from app.models import Document, DocumentShare, User
 from app.schemas.document import DocumentCreate, DocumentUpdate
-from app.services.permissions import Permission, can_edit, resolve_permission
+from app.services.permissions import Permission, can_edit, can_view, resolve_permission
 from app.utils.import_file import doc_to_plain_text
 
 
@@ -38,7 +38,7 @@ async def get_document(
     shares = await _shares_for(db, document_id)
     permission = resolve_permission(document.owner_id, user_id, shares)
 
-    if permission is None:
+    if not can_view(permission):
         raise NotFoundError("Document not found")
 
     return document, permission

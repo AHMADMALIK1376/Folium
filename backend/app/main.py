@@ -1,3 +1,6 @@
+import logging
+import uuid
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -10,6 +13,8 @@ from app.core.exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Folium API", version="1.0.0")
 
@@ -42,6 +47,22 @@ async def handle_validation(request: Request, exc: ValidationError) -> JSONRespo
 @app.exception_handler(ConflictError)
 async def handle_conflict(request: Request, exc: ConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc) or "Conflict"})
+
+
+@app.exception_handler(Exception)
+async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all for anything not already mapped to a domain exception.
+
+    Never leaks exception detail or a traceback to the client — only a
+    correlation id, which is logged server-side alongside the full
+    exception and traceback for debugging.
+    """
+    correlation_id = str(uuid.uuid4())
+    logger.exception("Unhandled exception (correlation_id=%s)", correlation_id)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "correlation_id": correlation_id},
+    )
 
 
 app.include_router(api_router)

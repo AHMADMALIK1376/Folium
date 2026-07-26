@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models import Document, DocumentShare, User
 from app.schemas.share import ShareCreate
-from app.services.permissions import Permission
 from app.services.documents import get_document
+from app.services.permissions import Permission
 
 
 async def _require_owner(db: AsyncSession, document_id: UUID, user_id: UUID) -> Document:

@@ -140,6 +140,36 @@ These are the reasons v2 exists:
 - **No version history, no trash, no undo-delete.**
 - **Local SQLite file** — requires a persistent disk, so it cannot scale horizontally.
 
+## Development (v2)
+
+Requires Docker, Python 3.12+, and Node 22.5+.
+
+Start the database:
+
+```bash
+docker compose up -d
+```
+
+Run the backend:
+
+```bash
+cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]" && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m uvicorn app.main:app --reload
+```
+
+Interactive API docs are then served at http://localhost:8000/docs.
+
+Run the backend tests:
+
+```bash
+cd backend && .venv/Scripts/python -m pytest -v
+```
+
+### Branching
+
+`main` is always deployable and deploys automatically. Work on short-lived
+branches named `feat/<phase>-<thing>` and merge via pull request — CI gates the
+merge, and Vercel builds a preview deployment for every PR.
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — architecture decisions for both versions

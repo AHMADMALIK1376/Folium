@@ -205,7 +205,7 @@ async def test_editor_cannot_change_another_users_permission(
     shares = await client.get(
         f"/api/v1/documents/{doc_id}/shares", headers=headers(alice_email)
     )
-    carol_share = [s for s in shares.json() if s["user_id"] == carol_id][0]
+    carol_share = next(s for s in shares.json() if s["user_id"] == carol_id)
     assert carol_share["permission"] == "view"
 
 

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, File, UploadFile, status
 
@@ -19,7 +20,7 @@ ALLOWED_SUFFIXES = MARKDOWN_SUFFIXES | {".txt"}
 
 @router.post("/import", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 async def import_document(
-    db: DbSession, user: CurrentUser, file: UploadFile = File(...)
+    db: DbSession, user: CurrentUser, file: Annotated[UploadFile, File()]
 ) -> DocumentOut:
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:

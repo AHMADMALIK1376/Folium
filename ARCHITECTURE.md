@@ -1,51 +1,250 @@
-# Architecture Note
+# Architecture
+
+This document covers two things: the architecture Folium **has today** (v1), and the architecture it
+is **being rebuilt into** (v2). The full v2 design lives in
+[the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md); this is
+the summary and the reasoning.
+
+---
+
+# Part 1 — v2: the production architecture
+
+**Status: designed and approved, not yet implemented.**
 
 ## Summary
 
-Single Next.js 15 (App Router) app doing double duty as frontend and backend: React Server/Client Components for UI, API routes for the REST-ish surface, `node:sqlite` for persistence. One deployable unit, one process, one database file. For a 4-6 hour scope with one reviewer testing it, that's the simplest architecture that still demonstrates real full-stack judgment (schema design, access control, validation, API design) without the overhead of a separate backend service.
+Two independently deployable applications in one repository. A Next.js frontend on Vercel, a FastAPI
+backend on a persistent Python host, PostgreSQL and authentication on Supabase, and a managed service
+handling real-time collaboration.
 
-## What I prioritized, and why
+```
+Browser
+   │
+   ▼
+Next.js frontend (Vercel) ──── sign in ────► Supabase Auth
+   │                                              │
+   ├── REST + JWT ──────► FastAPI (Render) ───────┘ verifies JWT
+   │                           │
+   │                           ▼
+   │                     PostgreSQL (Supabase)
+   │                           ▲
+   └── WebSocket ──► Collab service ──┘ periodic snapshot via FastAPI
+```
 
-1. **A genuinely usable editor over a feature-complete one.** Bold/italic/underline/headings/lists cover the assignment's explicit requirements and are what most real documents actually use. I did not add tables, images-in-document, comments, or code blocks — not because they're hard, but because polishing five formatting types with reliable autosave felt like a better use of the time budget than shipping ten half-working ones.
-2. **Correct access control over rich permissions.** Sharing is binary (owner vs. has-access) rather than view/comment/edit roles. The assignment asks for "a visible distinction between owned and shared documents" and "a way to grant another user access" — I implemented that precisely, with server-side enforcement (every document API route re-checks ownership/share status, not just the UI), rather than half-implementing role-based permissions.
-3. **A small, dependency-free markdown importer over a full CommonMark library.** The importer only needs to produce formatting the editor itself understands (headings, bold, italic, lists) — pulling in a full markdown parser for that would be dependency weight without added value for this scope.
-4. **Real persistence over an in-memory mock.** Documents, shares, and users all live in SQLite and survive restarts — this was a hard requirement, not a nice-to-have.
+## How a request flows
 
-## What I deliberately cut
+1. **Sign-in goes directly from the frontend to Supabase.** Supabase validates the password and
+   returns a JWT. The FastAPI backend never sees passwords at all.
+2. **Every API call carries that token** in an `Authorization: Bearer` header. FastAPI verifies the
+   signature against Supabase's published JWKS and resolves the calling user. This replaces v1's
+   session cookie, which cannot work cleanly once the frontend and backend live on different origins.
+3. **FastAPI owns all business logic** — document CRUD, permission checks, sharing. It is the only
+   component that holds database credentials.
+4. **The collaboration service handles live editing** over a WebSocket, merging concurrent edits and
+   broadcasting cursor positions.
+5. **Merged documents are written back through FastAPI** on an interval.
 
-- **Real authentication.** The assignment explicitly permits mocked auth/seeded accounts. Implementing real password hashing, sessions, and sign-up would have eaten hours better spent on the editor and sharing logic, for a reviewer-facing demo where it adds no signal.
-- **Real-time collaborative editing** (live multi-cursor, operational transforms). Listed as an optional stretch goal in the brief; explicitly deprioritized per the instructions ("do not sacrifice core functionality to pursue stretch work").
-- **Version history / undo-delete / trash.** Would be the first thing I'd add with more time (see below).
-- **Granular permission levels** (view-only vs. edit) — everyone with access can currently edit. Simpler and still demonstrates the sharing model the assignment asks for; a real product would need this though.
+**The governing principle:** the collaboration service is a fast-moving cache for in-progress edits;
+PostgreSQL is the source of truth. Losing the vendor must never mean losing documents.
+
+**The frontend never touches the database directly.** Supabase is used from the browser *only* for
+authentication. Every permission check happens server-side, in one place.
+
+## Why these technologies
+
+**Next.js over plain React + Vite.** Next.js *is* React — a framework built on it, not a competitor.
+Vite would mean losing server-side rendering, which a real product needs for an indexable marketing
+page, and rebuilding routing that Next.js already provides.
+
+**FastAPI over Django or Flask.** Django's headline advantages are its admin panel and built-in auth;
+Supabase provides auth, which removes most of that benefit, and Django's WebSocket story (Channels)
+is materially more awkward than FastAPI's native async. Flask has the weakest async support of the
+three. Real-time collaboration means many concurrent long-lived connections, and that is precisely
+FastAPI's strength.
+
+**PostgreSQL over MongoDB.** The data is inherently relational — users own documents, documents are
+shared with users. A document store would mean reimplementing joins by hand.
+
+**Supabase for both database and auth.** It collapses two decisions into one free-tier vendor and
+supplies OAuth and email flows without a separate email provider. Lock-in is limited by design: the
+application keeps its **own** `users` table in that same Postgres, referencing Supabase's auth user
+id. `documents` and `document_shares` point at the application's table, so the schema stays portable —
+leaving Supabase would mean migrating authentication, not the whole data model.
+
+**A managed collaboration service over self-hosting.** This is a direct consequence of the $0
+budget, and it is worth being explicit about because it looks like a luxury and is actually the
+opposite. WebSocket connections need an always-on server process, but free hosting tiers sleep after
+inactivity, dropping live connections. A managed service provides always-on sync infrastructure
+without paying for an always-on process, and lets FastAPI serve only REST traffic, which tolerates
+cold starts far better.
+
+**Python over Node/TypeScript**, accepting a real tradeoff. A TypeScript backend would allow shared
+types across the stack and near plug-and-play Yjs integration. Python was chosen for the developer's
+existing strength, and the collaboration gap was closed by using a managed service rather than
+hand-building CRDT sync.
+
+**Managed auth over self-built.** Building it properly means password hashing, JWT and refresh token
+rotation, email verification, password reset, OAuth, and login rate limiting — roughly 4–7 days, with
+the security risk carried personally. Deferred, possibly revisited as a learning exercise after
+launch.
+
+## Backend layering
+
+`api/` handles HTTP only — parsing, validation, status codes. `services/` holds business logic and
+knows nothing about HTTP. `models/` talks to the database. This separation is what makes permission
+logic testable without starting a web server.
+
+Two properties are carried over from v1 unchanged, because they were already right:
+
+- **Pydantic schemas stay separate from SQLAlchemy models.** The API contract and the database tables
+  are different things and must be free to change independently.
+- **`can_access_document` stays a pure function** with no database calls inside it, so it can be unit
+  tested directly rather than through an HTTP round-trip.
+
+## The data model, and what changed
+
+Five tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`. The full
+DDL is in the spec. The changes that matter:
+
+**`content` becomes `jsonb` instead of an HTML string.** The most consequential change. v1 stores
+rendered HTML; TipTap's native format is JSON, with HTML as one possible export. Storing JSON means
+never parsing HTML to manipulate a document, makes content queryable, and is required by the
+collaboration service, which operates on structured nodes. Staying on HTML would actively obstruct
+real-time editing.
+
+**A `permission` column on shares** — view / comment / edit, replacing v1's binary access.
+
+**A `document_versions` table** — snapshots on meaningful saves, enabling restore.
+
+**Soft delete** via `is_deleted` and `deleted_at`. v1 deletes permanently, which for real users is a
+support nightmare.
+
+**`uuid` and `timestamptz`** instead of custom string ids and text timestamps. UUIDs align with
+Supabase auth ids; real timestamps sort correctly across timezones.
+
+**Attachments store a path, not bytes.** v1 keeps file bytes in a `BLOB` column, which bloats the
+database, slows backups, and burns the free-tier storage quota. Files belong in Supabase Storage.
+
+## Error handling
+
+**Unauthorized access returns 404, not 403** — carried over from v1 deliberately. A 403 confirms that
+a document exists, leaking information to someone who should not have it. The lookup returns nothing
+for both "absent" and "forbidden".
+
+Validation errors return 422 with field-level detail. Domain errors are typed exceptions mapped to
+status codes by registered handlers, so `services/` never imports HTTP concepts. Unexpected
+exceptions return a generic 500 with a correlation id logged server-side; internal detail never
+reaches the client. Upload limits are enforced server-side, never trusting the client filter alone.
+
+## Brand system
+
+Two brand colours: **carmine `#D41F26`** and **white `#FFFFFF`**, plus a functional neutral ramp.
+Greys are structure, not brand — without them, text hierarchy, borders, and disabled states cannot be
+expressed.
+
+Carmine on white measures approximately **5.2:1** contrast: passes WCAG AA for normal text, fails
+AAA. It is an accent colour, not a body-copy colour.
+
+**Known risk:** the brand colour is red, which collides with the convention of red meaning "error" or
+"destructive". Mitigation: error text uses the darker `carmine-700`, and destructive actions use
+`carmine-700` *plus* a confirmation dialog, making them visually and interactionally heavier than a
+normal primary button.
+
+## The budget constraint, stated honestly
+
+Folium targets a **$0/month** operating cost, and that conflicts with "real product with real users"
+specifically around real-time collaboration. Two consequences are accepted:
+
+1. The managed collaboration service is not optional at this budget — it is what makes always-on
+   WebSockets possible without an always-on server.
+2. **Paid hosting becomes necessary at real traffic**, realistically ~$20–25/month. Free tiers are
+   sufficient for launch and early users only.
+
+---
+
+# Part 2 — v1: the interview build
+
+This is what the code in the repository does today.
+
+## Summary
+
+A single Next.js 15 App Router application doing double duty as frontend and backend: React
+Server/Client Components for UI, API routes for the REST-ish surface, `node:sqlite` for persistence.
+One deployable unit, one process, one database file. For a 4–6 hour scope with one reviewer testing
+it, that was the simplest architecture that still demonstrated schema design, access control,
+validation, and API design without the overhead of a separate backend service.
+
+## What was prioritized, and why
+
+1. **A genuinely usable editor over a feature-complete one.** Bold/italic/underline/headings/lists
+   cover what most real documents use. Tables, in-document images, comments, and code blocks were
+   omitted — not because they're hard, but because polishing five formatting types with reliable
+   autosave was a better use of the time budget than shipping ten half-working ones.
+2. **Correct access control over rich permissions.** Sharing is binary rather than role-based, but
+   enforced server-side on every document route, not merely hidden in the UI.
+3. **A small, dependency-free markdown importer over a full CommonMark library.** The importer only
+   needs to produce formatting the editor itself understands.
+4. **Real persistence over an in-memory mock.** Documents, shares, and users survive restarts.
+
+## What was deliberately cut
+
+- **Real authentication** — the assignment explicitly permitted mocked auth and seeded accounts.
+- **Real-time collaborative editing** — a listed optional stretch goal, explicitly deprioritized.
+- **Version history, undo-delete, trash.**
+- **Granular permission levels** — everyone with access can edit.
 
 ## Data model
 
-Four tables, `users`, `documents`, `document_shares`, `attachments` (the last one is schema-ready but not wired into the UI — see below). Access control is one function: `canAccessDocument(doc, userId, sharedUserIds)` — owner or in the share list, nothing more. It's pure (no I/O), which is why it's unit tested directly rather than through an HTTP round-trip.
+Four tables: `users`, `documents`, `document_shares`, `attachments` (the last schema-ready but not
+wired into the UI). Access control is one function, `canAccessDocument(doc, userId, sharedUserIds)` —
+owner or in the share list, nothing more. It is pure, which is why it is unit tested directly rather
+than through an HTTP round-trip.
 
-Every document API route does the same three things in order: authenticate (cookie → user), authorize (`getDocumentWithMeta` returns `null` for both "doesn't exist" and "you can't see it" — deliberately, to avoid leaking document existence to unauthorized users via a 403-vs-404 timing/response difference), then validate the request body with Zod before touching the database.
+Every document API route does the same three things in order: authenticate (cookie → user), authorize
+(`getDocumentWithMeta` returns `null` for both "doesn't exist" and "you can't see it", deliberately,
+to avoid leaking document existence), then validate the request body with Zod before touching the
+database.
 
 ## A real decision made mid-build: why `node:sqlite` instead of Prisma
 
-I started this build with Prisma + SQLite, which was the obvious choice. Partway through, I hit a wall: Prisma's `@prisma/engines` package downloads a native query-engine binary from a third-party CDN (`binaries.prisma.sh`) during install, and in the sandboxed environment I was building in, that CDN was blocked at the network level (403). No amount of retrying or cache-priming fixes that — it's a hard external dependency Prisma requires at install time that I could not control.
+The build started with Prisma + SQLite, the obvious choice. Partway through it hit a wall: Prisma's
+`@prisma/engines` package downloads a native query-engine binary from a third-party CDN
+(`binaries.prisma.sh`) during install, and in the sandboxed build environment that CDN was blocked at
+the network level (403). No amount of retrying or cache-priming fixes that — it is a hard external
+dependency required at install time.
 
-Rather than burn the remaining time budget fighting an environment constraint, I made a call: drop Prisma, use Node's built-in `node:sqlite` module instead (stable-enough since Node 22.5, ships with the runtime, zero extra install). This meant hand-writing the schema (plain `CREATE TABLE IF NOT EXISTS` statements) and query layer (parameterized `prepare()`/`run()`/`get()`/`all()` calls) instead of getting them generated — a bit more typing, but it removed an entire class of install-time fragility and an external network dependency for something as basic as local persistence. I'd make the same call again: a demo app that reliably starts beats one with a nicer ORM that might not install in someone else's constrained environment either.
+Rather than burn the remaining time budget fighting an environment constraint, the call was to drop
+Prisma and use Node's built-in `node:sqlite` instead — stable since Node 22.5, ships with the
+runtime, zero extra install. That meant hand-writing the schema and query layer instead of getting
+them generated: more typing, but it removed an entire class of install-time fragility for something
+as basic as local persistence.
 
-The tradeoff: no Prisma Studio, no auto-generated migrations, and `node:sqlite` is still an experimental Node API (though stable behavior since 22.5, with an `ExperimentalWarning` printed at startup that's safe to ignore). For a project this size, I judged that acceptable.
+The tradeoff: no Prisma Studio, no auto-generated migrations, and `node:sqlite` remains an
+experimental Node API (stable behaviour since 22.5, with an `ExperimentalWarning` at startup that is
+safe to ignore).
 
-## Deployment note (also see `DEPLOY.md`)
+**Note for v2:** this constraint no longer applies. v2 uses SQLAlchemy and Alembic against
+PostgreSQL, which have no comparable install-time binary dependency.
 
-Because persistence is a single SQLite file on local disk, this app needs a **long-running process with a writable local filesystem** — not a serverless/edge platform. Serverless platforms (Vercel's default deployment model, for example) run each request in an ephemeral or non-shared filesystem, so a local SQLite file would not reliably persist across requests or concurrent invocations. I deployed instead to a platform that runs the app as a persistent Node process (see `DEPLOY.md` for the exact steps and reasoning). This is the kind of infrastructure tradeoff the assignment specifically asks candidates to reason about explicitly, so I wanted to call it out rather than let it be implicit.
+## Deployment constraint
+
+Because persistence is a single SQLite file on local disk, v1 needs a **long-running process with a
+writable local filesystem** — not a serverless or edge platform. Serverless platforms run each
+request with an ephemeral or non-shared filesystem, so a local SQLite file would not reliably persist
+across requests or concurrent invocations.
+
+**This constraint disappears in v2**, since Postgres is a network service — which is what allows the
+v2 frontend to deploy to Vercel.
 
 ## Post-build security patch: Next.js 14 → 15
 
-The project was originally built on Next.js 14.2.5. After a first local `npm install` on a clean machine, npm flagged that version as having a known vulnerability. I looked into it: Next.js had backported a fix for one CVE to 14.2.35, but a separate high-severity denial-of-service issue in Server Components (CVE-2025-55184, fully fixed under CVE-2025-67779) was never backported to the 14.x line at all — it's only fixed from Next.js 15.0.7 onward. Since this app uses the App Router with Server Components throughout, that issue applies directly, not just in theory.
+v1 was originally built on Next.js 14.2.5. A clean `npm install` flagged that version as vulnerable.
+Next.js had backported a fix for one CVE to 14.2.35, but a separate high-severity denial-of-service
+issue in Server Components (CVE-2025-55184, fully fixed under CVE-2025-67779) was never backported to
+the 14.x line at all — it is only fixed from Next.js 15.0.7 onward. Since the app uses the App Router
+with Server Components throughout, that issue applied directly.
 
-Given that, I upgraded to Next.js 15.5.20 rather than settling for the incomplete 14.2.35 patch. That required a small, mechanical migration: Next 15 made `cookies()` and dynamic route `params` asynchronous, so `src/lib/auth.ts` and every API route/page reading a route param needed an `await` added. No behavioral changes, no new bugs — re-verified with a clean type check, the full test suite, and a full production build plus an end-to-end API smoke test afterward. This is the kind of "AI-assisted, not AI-blind" verification loop called out in `AI_WORKFLOW.md`: I didn't take the upgrade on faith, I re-ran everything that had passed before.
-
-## What I'd build next with another 2-4 hours
-
-1. **Document version history** — append-only snapshot table on save, with a simple "restore this version" UI. The schema change is trivial (a `document_versions` table); the UI is the bulk of the work.
-2. **View-only vs. edit sharing permissions** — add a `permission` column to `document_shares`, gate the editor's `editable` prop and the PATCH route on it.
-3. **Export to PDF/Markdown** — listed as a stretch goal; would reuse the existing HTML content with a headless-Chrome or markdown-serializer pass.
-4. **Attachments UI** — the `attachments` table already exists in the schema (upload → create-document is wired up; attach-a-file-to-an-existing-document is not). Finishing the UI for that was cut to keep upload scope tight and well-tested rather than half-covering two upload modes.
-5. **Optimistic concurrency on autosave** — right now, two people editing the same document simultaneously will silently overwrite each other's last save (last-write-wins). A version/timestamp check with a "this doc changed, reload?" prompt would be the first real-time-collaboration-adjacent improvement before attempting true live co-editing.
+The upgrade to 15.5.20 required a small mechanical migration: Next 15 made `cookies()` and dynamic
+route `params` asynchronous, so `src/lib/auth.ts` and every API route or page reading a route param
+needed an `await` added. No behavioural changes; re-verified with a clean type check, the full test
+suite, a production build, and an end-to-end API smoke test.

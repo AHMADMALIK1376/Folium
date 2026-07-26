@@ -1,40 +1,75 @@
 # Folium
 
-A lightweight collaborative document editor (Google-Docs-inspired), built for the Ajaia AI-Native Full Stack Developer assignment.
+A collaborative document editor — create, format, and edit rich-text documents in the browser, and
+share them with other people.
 
-Repo: https://github.com/AHMADMALIK1376/Folium
+> **Status: rebuilding for production — Phase 1 implemented.**
+> Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
+> **Phase 1 of the v2 rebuild is implemented**: a separated `frontend/` (Next.js) and `backend/`
+> (FastAPI) with PostgreSQL, SQLAlchemy + Alembic, document/sharing/import APIs, and CI. Authentication
+> is still a development-only stand-in (an email header, no passwords or sessions) — real auth,
+> real-time collaboration, and version history remain upcoming phases. See
+> [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) and the
+> [Phase 1 implementation plan](docs/superpowers/plans/2026-07-25-phase-1-foundation.md).
 
-Live demo: see `SUBMISSION.md` for the deployed URL and seeded test accounts.
+---
+
+## Where things stand
+
+| | v1 (in this repo today) | v2 (designed, being built) |
+|---|---|---|
+| Architecture | One Next.js app, frontend + API together | Separate Next.js frontend and FastAPI backend |
+| Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth |
+| Database | Local SQLite file | PostgreSQL on Supabase |
+| Content storage | HTML string | TipTap JSON |
+| Sharing | Binary — has access or doesn't | View / comment / edit permissions |
+| Collaboration | Autosave, refresh to see others' edits | Live multi-cursor editing |
+| Deletion | Permanent | Soft delete with a trash folder |
+| History | None | Version snapshots with restore |
 
 ## What it does
 
-- Create, rename, and edit rich-text documents in the browser (bold, italic, underline, headings, bulleted/numbered lists), with autosave.
+- Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
+  bulleted/numbered lists — with autosave.
 - Import a `.txt` or `.md` file as a new document.
-- Share a document with another (seeded) user; dashboard clearly separates "My Documents" from "Shared with Me".
-- Everything persists to disk and survives a refresh or server restart.
+- Share a document with another user; the dashboard separates documents you own from documents
+  shared with you.
+- Everything persists and survives a refresh or a server restart.
 
-## Tech stack
+## Planned stack (v2)
 
-- **Next.js 15** (App Router) + **TypeScript**, single full-stack app (frontend + API routes together).
-- **`node:sqlite`** (Node's built-in SQLite module) for persistence — no ORM, no external database service, no separate driver dependency. See `ARCHITECTURE.md` for why.
-- **TipTap** for the rich-text editor.
-- **Zod** for request validation.
-- Hand-written CSS (no UI framework) — kept the dependency footprint small.
-- Mocked auth: three seeded accounts, no passwords, cookie-based session. See `ARCHITECTURE.md` for the reasoning.
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js (React) + TypeScript |
+| Styling | Tailwind CSS + shadcn/ui |
+| Editor | TipTap |
+| Backend | Python + FastAPI |
+| Database | PostgreSQL on Supabase |
+| DB access | SQLAlchemy 2.0 (async) + Alembic |
+| Auth | Supabase Auth |
+| Real-time | Managed collaboration service |
+| Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
-## Requirements
+Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
 
-- **Node.js >= 22.5.0** (this project uses `node:sqlite`, which is a built-in module available from Node 22.5+ without a flag). Check with `node -v`.
-- No external database, no API keys, no paid services required.
+## Running v1 locally
 
-## Local setup
+The code in the repository right now is v1.
+
+### Requirements
+
+- **Node.js >= 22.5.0** — v1 uses `node:sqlite`, a built-in module available without a flag from
+  Node 22.5. Check with `node -v`.
+- No external database, API keys, or paid services.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open http://localhost:3000. You'll land on a login screen with three seeded accounts — click any one to continue (see "Test accounts" below). The database file is created automatically at `data/app.sqlite` on first run, pre-seeded with a couple of example documents.
+Open http://localhost:3000. You'll land on a login screen with three seeded accounts — click any one
+to continue. The database is created automatically at `data/app.sqlite` on first run and pre-seeded
+with example documents.
 
 To reset all data, stop the server and delete `data/app.sqlite*`.
 
@@ -42,6 +77,9 @@ To reset all data, stop the server and delete `data/app.sqlite*`.
 
 ```bash
 npm run build
+```
+
+```bash
 npm run start
 ```
 
@@ -51,11 +89,12 @@ npm run start
 npm test
 ```
 
-Runs Node's built-in test runner (`node --test`) against `test/*.test.ts`. Covers the document access-control logic (owner/shared/denied), request validation schemas, and the file-import markdown/text conversion.
+Runs Node's built-in test runner against `test/*.test.ts` — covering document access control
+(owner / shared / denied), request validation schemas, and file-import conversion.
 
-## Test accounts
+## Test accounts (v1)
 
-This app uses mocked auth (see `ARCHITECTURE.md`) — there's no sign-up flow. Pick any of these on the login screen to explore:
+v1 uses mocked auth, so there is no sign-up flow. Pick any of these on the login screen:
 
 | Name | Email |
 |---|---|
@@ -63,41 +102,93 @@ This app uses mocked auth (see `ARCHITECTURE.md`) — there's no sign-up flow. P
 | Bob Martinez | bob@example.com |
 | Carol Singh | carol@example.com |
 
-Alice and Bob each start with one seeded document; Bob's "Q3 Roadmap" doc is pre-shared with Alice, so you can see the sharing UI immediately without setting anything up. To test sharing yourself: log in as one user, open a document you own, click **Share**, and enter another seeded account's email (e.g. `carol@example.com`).
+Alice and Bob each start with one seeded document. Bob's "Q3 Roadmap" is pre-shared with Alice, so
+the sharing UI has something to show immediately. To test sharing yourself: log in as one user, open
+a document you own, click **Share**, and enter another account's email.
 
-## File upload
+## File upload (v1)
 
-Supported file types: **`.txt` and `.md`/`.markdown` only**, max 2MB. This is enforced both in the UI (the file picker's `accept` filter) and on the server (the upload API rejects anything else with a clear error message).
+Supported types: **`.txt` and `.md`/`.markdown` only**, max 2MB — enforced both in the UI and on the
+server.
 
-- `.txt` files are split into paragraphs on blank lines.
-- `.md` files go through a small, dependency-free converter that handles `#`/`##`/`###` headings, `**bold**`, `*italic*`, and `-`/numbered lists — the same formatting the editor itself supports. It is **not** a full CommonMark parser (no tables, code blocks, links, nested lists, etc.) — this was a deliberate scope cut given the assignment's editor only needs to support that same formatting subset. See `ARCHITECTURE.md`.
+- `.txt` files split into paragraphs on blank lines.
+- `.md` files pass through a small dependency-free converter handling `#`/`##`/`###` headings,
+  `**bold**`, `*italic*`, and `-`/numbered lists. It is **not** a full CommonMark parser — no tables,
+  code blocks, links, or nested lists.
 
-## Project structure
+## Repository layout
 
 ```
-src/
-  app/                 Next.js App Router pages + API routes
-    api/                 REST-ish API endpoints (documents, sharing, upload, auth)
-    dashboard/            Dashboard page
-    documents/[id]/        Document editor page
-    login/                Login page
-  components/           React client components (editor, toolbar, share modal, etc.)
-  lib/
-    db.ts                 SQLite connection, schema migration, auto-seed
-    repo.ts                Data access layer + access-control logic
-    auth.ts                Cookie-based mocked session helpers
-    validation.ts           Zod schemas
-    importFile.ts            .txt/.md → HTML conversion for file import
-test/                  node:test test suite
-data/                  SQLite database file lives here (gitignored)
+frontend/               Next.js application (v1 today, v2 UI going forward)
+  src/app/                 pages + API routes
+  src/components/          React components
+  src/lib/                 db, repo, auth, validation, file import
+  test/                    frontend test suite
+backend/                FastAPI application (v2)
+  app/api/                 route handlers
+  app/core/                exceptions, constants
+  app/db/                  session, base
+  app/models/              SQLAlchemy models
+  app/schemas/             pydantic request/response schemas
+  app/services/            business logic
+  app/utils/               file import, conversions
+  alembic/                 database migrations
+  tests/                   backend test suite
+docs/
+  superpowers/specs/      design specs for the v2 rebuild
+  superpowers/plans/      implementation plans for the v2 rebuild
+  archive/                original interview submission artifacts
+.github/workflows/      CI pipelines
+docker-compose.yml      local PostgreSQL for development
+ARCHITECTURE.md         architecture, v1 and v2
+DEPLOY.md               deployment guide
 ```
 
-## Known limitations / what's out of scope
+## Known limitations of v1
 
-- **Auth is mocked.** No passwords, no real sign-up. Explicitly allowed by the assignment ("You may simulate users with seeded accounts, mocked auth, or a lightweight login flow").
-- **Sharing is binary** (has access / doesn't) — no view-only vs. edit permission levels.
-- **Markdown import is intentionally minimal** — headings, bold, italic, and lists only (matches the editor's own formatting support).
-- **No real-time collaboration** (e.g. no live multi-cursor editing) — autosave + refresh-to-see-others'-changes only. Listed as a stretch goal in the assignment; deliberately deprioritized in favor of a solid core editing/sharing/persistence experience.
-- **No document version history or trash/undo-delete.**
+These are the reasons v2 exists:
 
-See `SUBMISSION.md` for the full "what's working / what's next" breakdown.
+- **Auth is mocked** — no passwords, no sign-up.
+- **Sharing is binary** — no view-only vs. edit levels.
+- **Markdown import is minimal** — headings, bold, italic, lists only.
+- **No real-time collaboration** — autosave only; simultaneous editors silently overwrite each other.
+- **No version history, no trash, no undo-delete.**
+- **Local SQLite file** — requires a persistent disk, so it cannot scale horizontally.
+
+## Development (v2)
+
+Requires Docker, Python 3.12+, and Node 22.5+.
+
+Start the database:
+
+```bash
+docker compose up -d
+```
+
+Run the backend:
+
+```bash
+cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]" && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m uvicorn app.main:app --reload
+```
+
+Interactive API docs are then served at http://localhost:8000/docs.
+
+Run the backend tests:
+
+```bash
+cd backend && .venv/Scripts/python -m pytest -v
+```
+
+### Branching
+
+`main` is always deployable and deploys automatically. Work on short-lived
+branches named `feat/<phase>-<thing>` and merge via pull request — CI gates the
+merge, and Vercel builds a preview deployment for every PR.
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — architecture decisions for both versions
+- [DEPLOY.md](DEPLOY.md) — deployment guide
+- [Foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) — the full
+  v2 design
+- [docs/archive/](docs/archive/) — original interview submission notes

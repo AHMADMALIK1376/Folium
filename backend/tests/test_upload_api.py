@@ -49,3 +49,13 @@ async def test_rejects_non_utf8_content(client: AsyncClient, alice):
     response = await client.post("/api/v1/documents/import", files=files, headers=alice)
 
     assert response.status_code == 422
+
+
+async def test_long_filename_is_truncated_not_500(client: AsyncClient, alice):
+    # Test that a 600-character filename is truncated to 500, not causing a 500 error
+    long_name = "x" * 600 + ".txt"
+    files = {"file": (long_name, b"test content", "text/plain")}
+    response = await client.post("/api/v1/documents/import", files=files, headers=alice)
+
+    assert response.status_code == 201
+    assert len(response.json()["title"]) == 500

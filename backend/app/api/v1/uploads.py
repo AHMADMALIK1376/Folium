@@ -12,6 +12,7 @@ from app.utils.import_file import markdown_to_doc, plain_text_to_doc, title_from
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 MAX_BYTES = 2 * 1024 * 1024
+MAX_TITLE_LENGTH = 500  # Matches DocumentCreate.title max_length; truncate long filenames to avoid pydantic ValidationError
 MARKDOWN_SUFFIXES = {".md", ".markdown"}
 ALLOWED_SUFFIXES = MARKDOWN_SUFFIXES | {".txt"}
 
@@ -34,7 +35,8 @@ async def import_document(
         raise ValidationError("File must be UTF-8 encoded text") from exc
 
     content = markdown_to_doc(text) if suffix in MARKDOWN_SUFFIXES else plain_text_to_doc(text)
-    data = DocumentCreate(title=title_from_filename(file.filename or ""), content=content)
+    title = title_from_filename(file.filename or "")[:MAX_TITLE_LENGTH]
+    data = DocumentCreate(title=title, content=content)
     document = await service.create_document(db, user.id, data)
     owner = await service.load_owner(db, document.owner_id)
 

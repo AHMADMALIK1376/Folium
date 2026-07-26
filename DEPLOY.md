@@ -1,7 +1,9 @@
 # Deployment Guide
 
-This covers deployment for both versions. **v2 is designed but not yet implemented** — its section
-describes the target setup and is not yet runnable.
+This covers deployment for both versions. **Phase 1 of v2 is implemented** — the separated
+`frontend/` and `backend/` applications, PostgreSQL, and CI all exist and run. The Supabase Auth and
+managed-collaboration pieces described in Part 1 arrive in later phases, so treat those steps as the
+target setup rather than something you can complete today.
 
 ---
 

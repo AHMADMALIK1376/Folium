@@ -103,7 +103,9 @@ class JwksCache:
                     logger.warning("Skipping JWKS entry with no kid")
                     continue
                 parsed_keys[kid] = PyJWK.from_dict(jwk)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+                # Catch all exceptions: a malformed entry from remote input must cost
+                # only that entry, not the entire authentication for all users.
                 logger.warning("Skipping malformed JWKS entry: %s", exc)
                 continue
 

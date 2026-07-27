@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import pytest
 
@@ -58,7 +57,7 @@ async def test_expired_cache_refetches():
     fetcher = FakeFetcher()
     cache = JwksCache(fetcher=fetcher, ttl_seconds=0)
     await cache.get_key(TEST_KID)
-    time.sleep(0.01)
+    await asyncio.sleep(0.01)
     await cache.get_key(TEST_KID)
     assert fetcher.calls == 2
 

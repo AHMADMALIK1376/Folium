@@ -17,7 +17,17 @@ from app.core.exceptions import (
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Folium API", version="1.0.0")
+# Publishing the full API surface is useful locally and needless exposure in
+# production, where it hands anyone probing the service a complete map.
+_docs_enabled = settings.is_development
+
+app = FastAPI(
+    title="Folium API",
+    version="1.0.0",
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 
 app.add_middleware(
     CORSMiddleware,

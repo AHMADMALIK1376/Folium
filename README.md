@@ -7,8 +7,9 @@ share them with other people.
 > Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
 > **Phase 1 of the v2 rebuild is implemented**: a separated `frontend/` (Next.js) and `backend/`
 > (FastAPI) with PostgreSQL, SQLAlchemy + Alembic, document/sharing/import APIs, and CI. Authentication
-> is still a development-only stand-in (an email header, no passwords or sessions) — real auth,
-> real-time collaboration, and version history remain upcoming phases. See
+> uses real Supabase JWT verification (Phase 2A) — the frontend still runs the old v1 code and is
+> not yet connected to the backend. Frontend auth pages, the design system, and the FastAPI
+> cut-over remain upcoming phases. See
 > [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) and the
 > [Phase 1 implementation plan](docs/superpowers/plans/2026-07-25-phase-1-foundation.md).
 
@@ -170,6 +171,16 @@ Run the backend:
 ```bash
 cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]" && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m uvicorn app.main:app --reload
 ```
+
+The backend requires `SUPABASE_URL` to verify tokens. Copy `backend/.env.example` to `backend/.env`
+and set it to your project URL:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+```
+
+Requests must carry a Supabase-issued JWT as `Authorization: Bearer <token>`. There is no
+development bypass — the tests mint their own signed tokens instead.
 
 Interactive API docs are then served at http://localhost:8000/docs.
 

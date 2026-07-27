@@ -53,10 +53,13 @@ Set up Supabase first — both other services need its credentials.
    ```
    DATABASE_URL=<Supabase connection string>
    SUPABASE_URL=<project URL>
-   SUPABASE_SERVICE_ROLE_KEY=<service_role key>
-   SUPABASE_JWT_ISSUER=<project URL>/auth/v1
    FRONTEND_ORIGIN=<your Vercel URL>
+   ENVIRONMENT=production
    ```
+
+   `SUPABASE_SERVICE_ROLE_KEY` is deliberately absent. The backend only verifies tokens against
+   Supabase's public keys and never calls the admin API, so it has no need for a credential that could
+   mint tokens or bypass access control. Do not add it.
 
 5. Run migrations once the service is up: `alembic upgrade head`.
 

@@ -103,3 +103,25 @@ async def test_documents_route_also_requires_a_valid_token(client: AsyncClient):
     assert (await client.get("/api/v1/documents")).status_code == 401
     token = make_token(issuer=ISSUER, email=f"docs-{uuid.uuid4()}@example.com")
     assert (await client.get("/api/v1/documents", headers=bearer(token))).status_code == 200
+
+
+async def test_jwks_outage_returns_503_not_401_or_200(client: AsyncClient):
+    """An unreachable key endpoint is an infrastructure fault, not an auth
+    decision, and must never let a request through."""
+    from app.core import jwks as jwks_module
+
+    original = jwks_module.jwks_cache._fetcher
+    jwks_module.jwks_cache.clear()
+
+    async def failing_fetcher():
+        raise RuntimeError("supabase unreachable")
+
+    jwks_module.jwks_cache._fetcher = failing_fetcher
+    try:
+        response = await client.get("/api/v1/me", headers=bearer(make_token(issuer=ISSUER)))
+    finally:
+        jwks_module.jwks_cache._fetcher = original
+        jwks_module.jwks_cache.clear()
+
+    assert response.status_code == 503
+    assert response.status_code not in (200, 401)

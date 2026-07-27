@@ -711,7 +711,7 @@ import pytest
 from app.core.exceptions import JwksUnavailableError
 from app.core.jwks import JwksCache
 from app.core.security import InvalidTokenError, verify_token
-from tests.keys import OMIT, jwks_document, make_token, other_private_key, private_key
+from tests.keys import OMIT, TEST_KID, jwks_document, make_token, other_private_key, private_key
 
 ISSUER = "https://test.supabase.co/auth/v1"
 
@@ -818,19 +818,46 @@ async def test_hs256_token_signed_with_the_public_key_is_rejected():
     algorithms, an attacker could sign a forged token using that public key as
     the shared secret and be accepted as any user. Pinning the algorithm list
     is what closes this.
+
+    Hand-forged with raw HMAC rather than jwt.encode: PyJWT refuses to sign
+    HS256 with a PEM key. An attacker is under no such constraint, so the
+    guard has to live in our verifier, not in the library building the token.
     """
+    import base64
+    import hashlib
+    import hmac
+    import json
+    import time
+
     from cryptography.hazmat.primitives import serialization
 
     public_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    forged = jwt.encode(
-        {"sub": str(uuid.uuid4()), "email": "attacker@example.com", "iss": ISSUER, "aud": "authenticated"},
-        public_pem,
-        algorithm="HS256",
-        headers={"kid": "test-key-1"},
+
+    def b64(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    header = b64(
+        json.dumps({"alg": "HS256", "typ": "JWT", "kid": TEST_KID}, separators=(",", ":")).encode()
     )
+    payload = b64(
+        json.dumps(
+            {
+                "sub": str(uuid.uuid4()),
+                "email": "attacker@example.com",
+                "iss": ISSUER,
+                "aud": "authenticated",
+                "exp": int(time.time()) + 3600,
+            },
+            separators=(",", ":"),
+        ).encode()
+    )
+    signing_input = f"{header}.{payload}".encode()
+    signature = hmac.new(public_pem, signing_input, hashlib.sha256).digest()
+    forged = f"{header}.{payload}.{b64(signature)}"
+
     with pytest.raises(InvalidTokenError):
         await verify_token(forged, cache=cache_for())
 

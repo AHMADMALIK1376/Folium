@@ -711,7 +711,7 @@ import pytest
 from app.core.exceptions import JwksUnavailableError
 from app.core.jwks import JwksCache
 from app.core.security import InvalidTokenError, verify_token
-from tests.keys import jwks_document, make_token, other_private_key, private_key
+from tests.keys import OMIT, jwks_document, make_token, other_private_key, private_key
 
 ISSUER = "https://test.supabase.co/auth/v1"
 
@@ -798,7 +798,14 @@ async def test_non_uuid_sub_is_rejected():
         await verify_token(token, cache=cache_for())
 
 
-async def test_missing_email_is_rejected():
+async def test_absent_email_claim_is_rejected():
+    token = make_token(issuer=ISSUER, email=OMIT)
+    with pytest.raises(InvalidTokenError):
+        await verify_token(token, cache=cache_for())
+
+
+async def test_null_email_claim_is_rejected():
+    """Present-but-null is a different input from absent; both must fail."""
     token = make_token(issuer=ISSUER, email=None)
     with pytest.raises(InvalidTokenError):
         await verify_token(token, cache=cache_for())
@@ -854,13 +861,13 @@ async def test_garbage_token_is_rejected():
 
 
 async def test_missing_kid_header_is_rejected():
-    token = make_token(issuer=ISSUER, headers={"kid": None})
+    token = make_token(issuer=ISSUER, kid=OMIT)
     with pytest.raises(InvalidTokenError):
         await verify_token(token, cache=cache_for())
 
 
 async def test_unknown_kid_is_rejected():
-    token = make_token(issuer=ISSUER, headers={"kid": "rotated"})
+    token = make_token(issuer=ISSUER, kid="rotated")
     with pytest.raises(InvalidTokenError):
         await verify_token(token, cache=cache_for())
 
@@ -999,7 +1006,7 @@ async def verify_token(token: str, cache=None) -> TokenClaims:
 cd D:/AJAIA/Folium/backend && .venv/Scripts/python -m pytest tests/test_security.py -v
 ```
 
-Expected: 17 tests PASS. If `test_hs256_token_signed_with_the_public_key_is_rejected` fails, stop — the algorithm allowlist is not being applied and the system is exploitable.
+Expected: 18 tests PASS. If `test_hs256_token_signed_with_the_public_key_is_rejected` fails, stop — the algorithm allowlist is not being applied and the system is exploitable.
 
 - [ ] **Step 5: Commit**
 

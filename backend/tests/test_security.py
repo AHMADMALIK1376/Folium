@@ -176,6 +176,42 @@ async def test_alg_none_is_rejected():
         await verify_token(forged, cache=cache_for())
 
 
+async def test_algorithm_mismatched_with_key_type_is_rejected():
+    """Algorithm/key-type confusion.
+
+    The JWKS `kid` is public, so an attacker can build a token whose header
+    claims `alg: RS256` while the key we actually hold for that `kid` is an
+    EC key. If the verifier unwraps the PyJWK to the raw cryptography key,
+    PyJWT picks the algorithm from this attacker-controlled header and calls
+    RSAAlgorithm.prepare_key on an EC key, raising a bare TypeError that
+    escapes verify_token as an unhandled 500 instead of InvalidTokenError.
+    Hand-forged because jwt.encode would never itself produce a header/key
+    mismatch like this; an attacker is under no such constraint.
+    """
+    import base64
+    import json
+
+    def b64(data: dict) -> str:
+        raw = json.dumps(data, separators=(",", ":")).encode()
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+    header = b64({"alg": "RS256", "typ": "JWT", "kid": TEST_KID})
+    payload = b64(
+        {
+            "sub": str(uuid.uuid4()),
+            "email": "a@example.com",
+            "iss": ISSUER,
+            "aud": "authenticated",
+            "exp": int(time.time()) + 3600,
+        }
+    )
+    signature = base64.urlsafe_b64encode(b"not-a-real-signature").rstrip(b"=").decode()
+    forged = f"{header}.{payload}.{signature}"
+
+    with pytest.raises(InvalidTokenError):
+        await verify_token(forged, cache=cache_for())
+
+
 async def test_garbage_token_is_rejected():
     with pytest.raises(InvalidTokenError):
         await verify_token("not.a.jwt", cache=cache_for())

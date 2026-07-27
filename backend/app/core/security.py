@@ -67,9 +67,16 @@ async def verify_token(token: str, cache=None) -> TokenClaims:
         raise InvalidTokenError("Invalid token") from exc
 
     try:
+        # Pass the PyJWK itself, not key.key. A raw cryptography key lets
+        # PyJWT pick the algorithm from the attacker-controlled header (only
+        # constrained to ALLOWED_ALGORITHMS), so a token claiming alg=RS256
+        # against our real EC key reaches RSAAlgorithm.prepare_key and raises
+        # a bare TypeError instead of a PyJWTError. Passing the PyJWK binds
+        # verification to the key's own algorithm, so a mismatched header
+        # raises InvalidAlgorithmError (a PyJWTError) and is caught below.
         payload = jwt.decode(
             token,
-            key.key,
+            key,
             algorithms=ALLOWED_ALGORITHMS,
             audience=settings.jwt_audience,
             issuer=settings.jwt_issuer,

@@ -14,12 +14,13 @@ def bearer(token: str) -> dict[str, str]:
 
 async def test_valid_token_provisions_a_user(client: AsyncClient):
     sub = str(uuid.uuid4())
-    token = make_token(sub=sub, email="Ada@Example.com", issuer=ISSUER)
+    email = f"Ada-{uuid.uuid4()}@Example.com"
+    token = make_token(sub=sub, email=email, issuer=ISSUER)
     response = await client.get("/api/v1/me", headers=bearer(token))
     assert response.status_code == 200
     body = response.json()
     assert body["id"] == sub
-    assert body["email"] == "ada@example.com"
+    assert body["email"] == email.lower()
 
 
 async def test_display_name_comes_from_user_metadata(client: AsyncClient):
@@ -42,11 +43,13 @@ async def test_same_sub_reuses_the_same_user(client: AsyncClient):
 
 async def test_changed_email_updates_the_stored_row(client: AsyncClient):
     sub = str(uuid.uuid4())
-    await client.get("/api/v1/me", headers=bearer(make_token(sub=sub, email="old@example.com", issuer=ISSUER)))
+    old_email = f"old-{uuid.uuid4()}@example.com"
+    new_email = f"new-{uuid.uuid4()}@example.com"
+    await client.get("/api/v1/me", headers=bearer(make_token(sub=sub, email=old_email, issuer=ISSUER)))
     response = await client.get(
-        "/api/v1/me", headers=bearer(make_token(sub=sub, email="new@example.com", issuer=ISSUER))
+        "/api/v1/me", headers=bearer(make_token(sub=sub, email=new_email, issuer=ISSUER))
     )
-    assert response.json()["email"] == "new@example.com"
+    assert response.json()["email"] == new_email
 
 
 async def test_missing_authorization_header_is_401(client: AsyncClient):

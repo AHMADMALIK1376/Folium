@@ -155,3 +155,52 @@ async def test_cold_cache_unknown_kid_fetches_exactly_once():
         await cache.get_key("never-seen-kid")
 
     assert fetcher.calls == 1
+
+
+async def test_non_dict_key_entry_is_skipped_but_valid_keys_survive():
+    valid_key = jwks_document()["keys"][0]
+    fetcher = FakeFetcher(document={"keys": ["junk", None, valid_key]})
+    cache = JwksCache(fetcher=fetcher, ttl_seconds=600)
+
+    key = await cache.get_key(TEST_KID)
+    assert key is not None
+
+
+async def test_all_entries_malformed_raises_unavailable():
+    fetcher = FakeFetcher(document={"keys": ["junk", None]})
+    cache = JwksCache(fetcher=fetcher, ttl_seconds=600)
+    with pytest.raises(JwksUnavailableError):
+        await cache.get_key(TEST_KID)
+
+
+async def test_sustained_failure_does_not_refetch_per_caller():
+    fetcher = FakeFetcher(fail=True)
+    cache = JwksCache(fetcher=fetcher, ttl_seconds=600, failure_backoff_seconds=5.0)
+
+    for _ in range(5):
+        with pytest.raises(JwksUnavailableError):
+            await cache.get_key(TEST_KID)
+
+    # Without the backoff, each queued caller would perform its own fetch.
+    assert fetcher.calls == 1
+
+
+async def test_backoff_expires_and_allows_a_retry():
+    fetcher = FakeFetcher(fail=True)
+    cache = JwksCache(fetcher=fetcher, ttl_seconds=600, failure_backoff_seconds=0)
+
+    for _ in range(2):
+        with pytest.raises(JwksUnavailableError):
+            await cache.get_key(TEST_KID)
+
+    # A zero backoff must not become a permanent lockout.
+    assert fetcher.calls == 2
+
+
+async def test_backoff_never_serves_a_key_from_an_empty_cache():
+    fetcher = FakeFetcher(fail=True)
+    cache = JwksCache(fetcher=fetcher, ttl_seconds=600, failure_backoff_seconds=5.0)
+
+    for _ in range(3):
+        with pytest.raises(JwksUnavailableError):
+            await cache.get_key(TEST_KID)

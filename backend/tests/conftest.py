@@ -2,6 +2,8 @@ import os
 
 os.environ.setdefault("ENVIRONMENT", "development")
 
+import uuid
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -9,13 +11,22 @@ from app.db.session import engine
 from app.main import app
 
 
-def auth_headers(email: str) -> dict[str, str]:
-    """Return request headers authenticating as `email`.
+def auth_headers(email: str, sub: str | None = None, **claims) -> dict[str, str]:
+    """Return headers authenticating as `email` with a real signed JWT.
 
-    Single source of truth for test authentication. Task 6 swaps the body of
-    this function for a real signed JWT; no test file changes.
+    Deterministic sub per email so repeated calls in one test resolve to the
+    same user.
     """
-    return {"X-Dev-User-Email": email}
+    from tests.keys import make_token
+
+    resolved = sub or str(uuid.uuid5(uuid.NAMESPACE_URL, f"folium-test:{email}"))
+    token = make_token(
+        sub=resolved,
+        email=email,
+        issuer="https://test.supabase.co/auth/v1",
+        **claims,
+    )
+    return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
@@ -29,3 +40,20 @@ async def client() -> AsyncClient:
 async def dispose_engine():
     yield
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _test_auth(monkeypatch):
+    from app.config import settings
+    from app.core import jwks as jwks_module
+    from tests.keys import jwks_document
+
+    monkeypatch.setattr(settings, "supabase_url", "https://test.supabase.co")
+
+    async def fetcher():
+        return jwks_document()
+
+    jwks_module.jwks_cache._fetcher = fetcher
+    jwks_module.jwks_cache.clear()
+    yield
+    jwks_module.jwks_cache.clear()

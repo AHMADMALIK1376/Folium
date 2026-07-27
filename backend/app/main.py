@@ -9,6 +9,7 @@ from app.api.v1.router import api_router
 from app.config import settings
 from app.core.exceptions import (
     ConflictError,
+    JwksUnavailableError,
     NotFoundError,
     PermissionDeniedError,
     ValidationError,
@@ -47,6 +48,14 @@ async def handle_validation(request: Request, exc: ValidationError) -> JSONRespo
 @app.exception_handler(ConflictError)
 async def handle_conflict(request: Request, exc: ConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc) or "Conflict"})
+
+
+@app.exception_handler(JwksUnavailableError)
+async def handle_jwks_unavailable(request: Request, exc: JwksUnavailableError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Authentication is temporarily unavailable"},
+    )
 
 
 @app.exception_handler(Exception)

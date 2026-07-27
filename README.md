@@ -158,29 +158,45 @@ These are the reasons v2 exists:
 
 ## Development (v2)
 
-Requires Docker, Python 3.12+, and Node 22.5+.
+Requires Python 3.12+ and Node 22.5+. Docker is optional.
 
-Start the database:
+### Database
 
-```bash
-docker compose up -d
-```
+Local development uses a **separate Supabase project** — not the production one. The test suite
+creates dozens of users and documents on every run, and pointing it at production would accumulate
+that in the database holding real user data.
 
-Run the backend:
+Create a second free project (e.g. `folium-dev`) in the same region as production, then copy
+`backend/.env.example` to `backend/.env` and fill in `DATABASE_URL` and `SUPABASE_URL` from it. That
+file is gitignored. Read the comments in `.env.example` first — two details bite otherwise: use the
+**session** pooler rather than the transaction pooler, and change the URL prefix Supabase gives you
+from `postgresql://` to `postgresql+asyncpg://`.
+
+Apply migrations and run the backend:
 
 ```bash
 cd backend && python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]" && .venv/Scripts/python -m alembic upgrade head && .venv/Scripts/python -m uvicorn app.main:app --reload
 ```
 
-The backend requires `SUPABASE_URL` to verify tokens. Copy `backend/.env.example` to `backend/.env`
-and set it to your project URL:
+Interactive API docs are served at http://localhost:8000/docs — only when `ENVIRONMENT=development`.
+
+### Faster tests, optionally
+
+The suite takes about 4 seconds against a local database and a minute or two over the network. If
+that matters, run PostgreSQL locally instead:
 
 ```bash
-SUPABASE_URL=https://your-project-ref.supabase.co
+docker compose up -d
 ```
 
+Then set `DATABASE_URL=postgresql+asyncpg://folium:folium@localhost:5433/folium`. Nothing else
+changes. CI does not use this — it starts its own PostgreSQL service and needs no credentials.
+
+### Authentication
+
 Requests must carry a Supabase-issued JWT as `Authorization: Bearer <token>`. There is no
-development bypass — the tests mint their own signed tokens instead.
+development bypass — the tests mint their own signed tokens against a local keypair, so the suite
+needs neither network access nor Supabase credentials.
 
 Interactive API docs are then served at http://localhost:8000/docs.
 

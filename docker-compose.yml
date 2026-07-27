@@ -1,3 +1,12 @@
+# OPTIONAL. Local development normally uses a dedicated Supabase project
+# (see README "Development"), so Docker is not required to work on Folium.
+#
+# This file remains for one reason: tests run in about 4 seconds against a
+# local database versus a minute or two over the network. If you want that
+# speed back, run `docker compose up -d` and point DATABASE_URL at
+# postgresql+asyncpg://folium:folium@localhost:5433/folium instead.
+#
+# CI does not use this file — it starts its own PostgreSQL service.
 services:
   db:
     image: postgres:16-alpine

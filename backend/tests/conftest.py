@@ -1,7 +1,3 @@
-import os
-
-os.environ.setdefault("ENVIRONMENT", "development")
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 

@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 # would let an attacker sign a forged token with it as the shared secret.
 ALLOWED_ALGORITHMS = ["ES256", "RS256"]
 
+# Must not exceed the column widths in app/models/user.py. user_metadata is
+# user-writable through Supabase's client, so an over-long value would other-
+# wise raise a database truncation error on every request from that account.
+MAX_EMAIL_LENGTH = 320
+MAX_DISPLAY_NAME_LENGTH = 200
+MAX_AVATAR_URL_LENGTH = 1000
+
 
 class InvalidTokenError(Exception):
     """The token is absent, malformed, or fails verification."""
@@ -99,16 +106,25 @@ async def verify_token(token: str, cache=None) -> TokenClaims:
         logger.info("Rejected token with no email claim")
         raise InvalidTokenError("Invalid token")
     email = email.strip().lower()
+    if len(email) > MAX_EMAIL_LENGTH:
+        logger.info("Rejected token with implausibly long email (%d chars)", len(email))
+        raise InvalidTokenError("Invalid token")
 
     metadata = payload.get("user_metadata") or {}
     if not isinstance(metadata, dict):
         metadata = {}
 
     avatar = metadata.get("avatar_url")
+    avatar_url = avatar if isinstance(avatar, str) and avatar.strip() else None
+    if avatar_url is not None and len(avatar_url) > MAX_AVATAR_URL_LENGTH:
+        # Drop rather than reject: a bad avatar must not lock a user out.
+        avatar_url = None
+
+    display_name = _display_name(metadata, email)[:MAX_DISPLAY_NAME_LENGTH]
 
     return TokenClaims(
         sub=sub,
         email=email,
-        display_name=_display_name(metadata, email),
-        avatar_url=avatar if isinstance(avatar, str) and avatar.strip() else None,
+        display_name=display_name,
+        avatar_url=avatar_url,
     )

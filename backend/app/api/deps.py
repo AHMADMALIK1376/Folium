@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError
-from app.core.security import TokenClaims, InvalidTokenError, verify_token
+from app.core.security import InvalidTokenError, TokenClaims, verify_token
 from app.db.session import get_db
 from app.models import User
 
@@ -68,7 +68,11 @@ async def _provision_user(db: AsyncSession, claims: TokenClaims) -> User:
     user = result.scalar_one()
 
     # Keep the row in step with Supabase without a separate sync job.
-    if user.email != claims.email or user.display_name != claims.display_name:
+    if (
+        user.email != claims.email
+        or user.display_name != claims.display_name
+        or user.avatar_url != claims.avatar_url
+    ):
         user.email = claims.email
         user.display_name = claims.display_name
         user.avatar_url = claims.avatar_url

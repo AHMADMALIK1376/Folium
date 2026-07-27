@@ -52,6 +52,57 @@ async def test_changed_email_updates_the_stored_row(client: AsyncClient):
     assert response.json()["email"] == new_email
 
 
+async def test_over_long_metadata_does_not_500(client: AsyncClient):
+    """A 400-char full_name must be truncated before it ever reaches the DB,
+    not raise a truncation error that becomes a permanent 500 for that user."""
+    email = f"longmeta-{uuid.uuid4()}@example.com"
+    token = make_token(
+        issuer=ISSUER, email=email, user_metadata={"full_name": "A" * 400}
+    )
+    response = await client.get("/api/v1/me", headers=bearer(token))
+    assert response.status_code == 200
+    assert len(response.json()["display_name"]) <= 200
+
+
+async def test_changed_avatar_updates_the_stored_row(client: AsyncClient):
+    sub = str(uuid.uuid4())
+    email = f"avatar-{uuid.uuid4()}@example.com"
+    old_avatar = "https://img/old.png"
+    new_avatar = "https://img/new.png"
+    await client.get(
+        "/api/v1/me",
+        headers=bearer(
+            make_token(sub=sub, email=email, issuer=ISSUER, user_metadata={"avatar_url": old_avatar})
+        ),
+    )
+    response = await client.get(
+        "/api/v1/me",
+        headers=bearer(
+            make_token(sub=sub, email=email, issuer=ISSUER, user_metadata={"avatar_url": new_avatar})
+        ),
+    )
+    assert response.json()["avatar_url"] == new_avatar
+
+
+async def test_concurrent_first_requests_provision_one_user(client: AsyncClient):
+    """Two simultaneous first requests must not race into a duplicate row."""
+    import asyncio
+
+    sub = str(uuid.uuid4())
+    email = f"race-{uuid.uuid4()}@example.com"
+    token = make_token(sub=sub, email=email, issuer=ISSUER)
+
+    responses = await asyncio.gather(
+        client.get("/api/v1/me", headers=bearer(token)),
+        client.get("/api/v1/me", headers=bearer(token)),
+        return_exceptions=True,
+    )
+
+    ok = [r for r in responses if not isinstance(r, Exception) and r.status_code == 200]
+    assert len(ok) == 2, f"expected both to succeed, got {responses}"
+    assert {r.json()["id"] for r in ok} == {sub}
+
+
 async def test_missing_authorization_header_is_401(client: AsyncClient):
     response = await client.get("/api/v1/me")
     assert response.status_code == 401

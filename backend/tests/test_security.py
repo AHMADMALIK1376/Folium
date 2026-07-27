@@ -1,12 +1,17 @@
 import time
 import uuid
 
-import jwt
 import pytest
 
 from app.core.exceptions import JwksUnavailableError
 from app.core.jwks import JwksCache
-from app.core.security import InvalidTokenError, verify_token
+from app.core.security import (
+    MAX_AVATAR_URL_LENGTH,
+    MAX_DISPLAY_NAME_LENGTH,
+    MAX_EMAIL_LENGTH,
+    InvalidTokenError,
+    verify_token,
+)
 from tests.keys import OMIT, TEST_KID, jwks_document, make_token, other_private_key, private_key
 
 ISSUER = "https://test.supabase.co/auth/v1"
@@ -56,6 +61,33 @@ async def test_avatar_url_is_extracted_when_present():
 
     token = make_token(issuer=ISSUER)
     assert (await verify_token(token, cache=cache_for())).avatar_url is None
+
+
+async def test_over_long_email_is_rejected():
+    """An email longer than the users.email column width (320) is not a
+    legitimate address; accepting it would raise a DB truncation error on
+    every subsequent request from that account."""
+    long_email = ("a" * (MAX_EMAIL_LENGTH - len("@example.com") + 1)) + "@example.com"
+    assert len(long_email) > MAX_EMAIL_LENGTH
+    token = make_token(issuer=ISSUER, email=long_email)
+    with pytest.raises(InvalidTokenError):
+        await verify_token(token, cache=cache_for())
+
+
+async def test_over_long_display_name_is_truncated():
+    token = make_token(issuer=ISSUER, user_metadata={"full_name": "A" * 400})
+    claims = await verify_token(token, cache=cache_for())
+    assert len(claims.display_name) == MAX_DISPLAY_NAME_LENGTH
+
+
+async def test_over_long_avatar_url_is_dropped():
+    """A bad avatar must not lock a user out, so this is a drop, not a
+    rejection."""
+    long_avatar_url = "https://img/" + "a" * (MAX_AVATAR_URL_LENGTH - len("https://img/") + 1)
+    assert len(long_avatar_url) > MAX_AVATAR_URL_LENGTH
+    token = make_token(issuer=ISSUER, user_metadata={"avatar_url": long_avatar_url})
+    claims = await verify_token(token, cache=cache_for())
+    assert claims.avatar_url is None
 
 
 async def test_expired_token_is_rejected():

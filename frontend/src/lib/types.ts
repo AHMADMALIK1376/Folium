@@ -20,3 +20,5 @@ export type DocumentWithMeta = DocumentRow & {
   is_owner: boolean;
   shared_with?: { id: string; name: string; email: string }[];
 };
+
+// CI probe: verifying required status check names resolve correctly.

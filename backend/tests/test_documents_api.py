@@ -3,19 +3,17 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-
-def headers(email: str) -> dict[str, str]:
-    return {"X-Dev-User-Email": email}
+from tests.conftest import auth_headers
 
 
 @pytest.fixture
 def alice() -> dict[str, str]:
-    return headers(f"alice-{uuid.uuid4()}@example.com")
+    return auth_headers(f"alice-{uuid.uuid4()}@example.com")
 
 
 @pytest.fixture
 def bob() -> dict[str, str]:
-    return headers(f"bob-{uuid.uuid4()}@example.com")
+    return auth_headers(f"bob-{uuid.uuid4()}@example.com")
 
 
 async def test_create_document(client: AsyncClient, alice):

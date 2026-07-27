@@ -9,6 +9,15 @@ from app.db.session import engine
 from app.main import app
 
 
+def auth_headers(email: str) -> dict[str, str]:
+    """Return request headers authenticating as `email`.
+
+    Single source of truth for test authentication. Task 6 swaps the body of
+    this function for a real signed JWT; no test file changes.
+    """
+    return {"X-Dev-User-Email": email}
+
+
 @pytest.fixture
 async def client() -> AsyncClient:
     transport = ASGITransport(app=app)

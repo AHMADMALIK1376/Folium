@@ -3,10 +3,12 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
+from tests.conftest import auth_headers
+
 
 @pytest.fixture
 def alice() -> dict[str, str]:
-    return {"X-Dev-User-Email": f"alice-{uuid.uuid4()}@example.com"}
+    return auth_headers(f"alice-{uuid.uuid4()}@example.com")
 
 
 async def test_import_markdown_creates_formatted_document(client: AsyncClient, alice):

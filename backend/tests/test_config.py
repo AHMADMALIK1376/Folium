@@ -19,5 +19,8 @@ def test_audience_and_ttl_defaults():
     assert s.jwks_cache_ttl_seconds == 600
 
 
-def test_environment_still_defaults_to_production():
+def test_environment_still_defaults_to_production(monkeypatch):
+    """The code default must be the safe value even with no env var set:
+    an unset ENVIRONMENT must never silently enable development behaviour."""
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
     assert Settings(_env_file=None).environment == "production"

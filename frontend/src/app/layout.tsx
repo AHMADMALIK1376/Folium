@@ -22,7 +22,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="font-sans antialiased">{children}</body>
+      {/* Browser extensions (password managers, ColorZilla, dark-mode tools)
+          inject attributes into <body> before React hydrates, which React
+          reports as a mismatch. This suppresses the warning for this element's
+          own attributes only — children still report mismatches normally, so a
+          real hydration bug is not hidden. Without it the dev overlay shows a
+          permanent issue, and permanent noise is how genuine warnings get
+          ignored. */}
+      <body className="font-sans antialiased" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.9",
     "@tailwindcss/postcss": "^4.3.3",
     "@tiptap/core": "2.27.2",
     "@tiptap/extension-underline": "2.27.2",

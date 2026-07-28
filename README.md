@@ -192,6 +192,19 @@ docker compose up -d
 Then set `DATABASE_URL=postgresql+asyncpg://folium:folium@localhost:5433/folium`. Nothing else
 changes. CI does not use this — it starts its own PostgreSQL service and needs no credentials.
 
+### Clearing test data
+
+The free tier allows one project, so development currently shares a database with production. Each
+full test run leaves roughly fifty throwaway accounts behind. To remove them:
+
+```bash
+cd backend && .venv/Scripts/python scripts/clean_test_data.py
+```
+
+That reports what it would delete and changes nothing. Add `--yes` to actually delete. It only ever
+removes accounts on `example.com`, `example.org`, and `example.net` — domains RFC 2606 reserves so
+they can never belong to a real person — and their documents and shares go with them via cascade.
+
 ### Authentication
 
 Requests must carry a Supabase-issued JWT as `Authorization: Bearer <token>`. There is no

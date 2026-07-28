@@ -47,6 +47,18 @@ async def create_document(
     return await _to_out(db, document, "owner")
 
 
+@router.get("/trash", response_model=list[DocumentSummary])
+async def list_trash(db: DbSession, user: CurrentUser) -> list[DocumentSummary]:
+    """Must stay above `/{document_id}`.
+
+    FastAPI matches in declaration order, so if the dynamic route came first,
+    `"trash"` would be parsed as a document id and fail UUID validation with a
+    422. `test_trash_route_is_not_parsed_as_a_document_id` guards this.
+    """
+    documents = await service.list_trash(db, user.id)
+    return [DocumentSummary.model_validate(d) for d in documents]
+
+
 @router.get("/{document_id}", response_model=DocumentOut)
 async def read_document(
     document_id: UUID, db: DbSession, user: CurrentUser

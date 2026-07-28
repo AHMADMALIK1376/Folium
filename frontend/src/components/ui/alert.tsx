@@ -19,58 +19,68 @@ const alertVariants = cva(
   }
 )
 
-function Alert({
-  className,
-  variant,
-  ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof alertVariants>) {
+const Alert = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & VariantProps<typeof alertVariants>
+>(({ className, variant, ...props }, ref) => {
   return (
     <div
       data-slot="alert"
       role="alert"
+      ref={ref}
       className={cn(alertVariants({ variant }), className)}
       {...props}
     />
   )
-}
+})
+Alert.displayName = "Alert"
 
-function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-title"
-      className={cn(
-        "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
-        className
-      )}
-      {...props}
-    />
-  )
-}
+const AlertTitle = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+  ({ className, ...props }, ref) => {
+    return (
+      <div
+        data-slot="alert-title"
+        ref={ref}
+        className={cn(
+          "font-medium group-has-[>svg]/alert:col-start-2 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+)
+AlertTitle.displayName = "AlertTitle"
 
-function AlertDescription({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-description"
-      className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
-        className
-      )}
-      {...props}
-    />
-  )
-}
+const AlertDescription = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+  ({ className, ...props }, ref) => {
+    return (
+      <div
+        data-slot="alert-description"
+        ref={ref}
+        className={cn(
+          "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+)
+AlertDescription.displayName = "AlertDescription"
 
-function AlertAction({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="alert-action"
-      className={cn("absolute top-2 right-2", className)}
-      {...props}
-    />
-  )
-}
+const AlertAction = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+  ({ className, ...props }, ref) => {
+    return (
+      <div
+        data-slot="alert-action"
+        ref={ref}
+        className={cn("absolute top-2 right-2", className)}
+        {...props}
+      />
+    )
+  }
+)
+AlertAction.displayName = "AlertAction"
 
 export { Alert, AlertTitle, AlertDescription, AlertAction }

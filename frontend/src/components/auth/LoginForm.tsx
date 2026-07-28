@@ -31,6 +31,7 @@ export function LoginForm() {
   const params = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
   const [magicSent, setMagicSent] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
 
   const {
     register,
@@ -73,9 +74,17 @@ export function LoginForm() {
     const { email } = parsed.data;
 
     const supabase = createClient();
+    setSendingLink(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
+      // Deliberately ignoring the error here (aside from the network-failure
+      // catch below). With shouldCreateUser: false, an unregistered address
+      // sends no email and never touches the rate limiter, so it can always
+      // show "Check your inbox." A registered address does consume the rate
+      // limit and will eventually 429 — special-casing that response would
+      // let a caller tell the two apart by how many requests it takes to see
+      // "Too many requests." Every outcome gets the same confirmation.
+      await supabase.auth.signInWithOtp({
         email,
         options: {
           emailRedirectTo: `${window.location.origin}/callback`,
@@ -87,18 +96,11 @@ export function LoginForm() {
         },
       });
 
-      if (error?.status === 429) {
-        setFormError("Too many requests. Wait a few minutes before asking for another link.");
-        return;
-      }
-
-      // Whether this address has an account or not, show the same
-      // confirmation. With shouldCreateUser: false, Supabase returns an
-      // error for unknown addresses — surfacing that distinctly would turn
-      // this into a tool for discovering who has an account here.
       setMagicSent(true);
     } catch {
       setFormError(NETWORK_FAILURE);
+    } finally {
+      setSendingLink(false);
     }
   };
 
@@ -153,8 +155,8 @@ export function LoginForm() {
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
 
-        <Button type="button" variant="ghost" onClick={sendMagicLink}>
-          Email me a sign-in link instead
+        <Button type="button" variant="ghost" disabled={sendingLink} onClick={sendMagicLink}>
+          {sendingLink ? "Sending…" : "Email me a sign-in link instead"}
         </Button>
       </div>
 

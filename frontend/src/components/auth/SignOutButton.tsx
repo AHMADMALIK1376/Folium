@@ -10,7 +10,10 @@ export function SignOutButton() {
 
   const signOut = async () => {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    // Local scope only: signing out on this device shouldn't kill sessions on
+    // the user's other devices. The default ("global") scope does exactly
+    // that.
+    await supabase.auth.signOut({ scope: "local" });
     router.push("/login");
     router.refresh();
   };

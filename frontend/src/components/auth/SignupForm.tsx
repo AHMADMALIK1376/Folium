@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -19,6 +20,7 @@ import { signupSchema, type SignupValues } from "@/lib/validation/auth";
 const NETWORK_FAILURE = "Could not reach the server. Check your connection and try again.";
 
 export function SignupForm() {
+  const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -33,16 +35,37 @@ export function SignupForm() {
     const supabase = createClient();
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: { emailRedirectTo: `${window.location.origin}/callback` },
       });
 
       if (error) {
+        // With email confirmations off, Supabase returns an error for an
+        // address that's already registered instead of the obfuscated user
+        // object it returns when confirmations are on. Treating this as
+        // success keeps the two cases indistinguishable — otherwise a taken
+        // address responds differently from a fresh one, and sign-up becomes
+        // an oracle for discovering who has an account.
+        if (error.code === "user_already_exists" || error.status === 422) {
+          setDone(true);
+          return;
+        }
+
         setFormError(error.status === 429
           ? "Too many sign-up attempts. Wait a few minutes and try again."
           : "Could not create the account. Try again.");
+        return;
+      }
+
+      // With email confirmations off, signUp returns a live session
+      // immediately — there is no confirmation email coming, so send them
+      // straight into the app instead of telling them to check an inbox
+      // that will stay empty.
+      if (data?.session) {
+        router.push("/account");
+        router.refresh();
         return;
       }
     } catch {

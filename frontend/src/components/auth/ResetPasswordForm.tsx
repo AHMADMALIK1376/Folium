@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -25,9 +25,20 @@ const NETWORK_FAILURE = "Could not reach the server. Check your connection and t
 
 /** How long to wait for Supabase's PASSWORD_RECOVERY event before assuming
  * this is a direct visit and settling into request-a-link mode. */
-const RECOVERY_DETECTION_TIMEOUT_MS = 500;
+const RECOVERY_DETECTION_TIMEOUT_MS = 2000;
 
-type Mode = "loading" | "recovery" | "request";
+/** Shown when the URL carries a recovery `code` — proof the visitor did open
+ * a reset link — but no PASSWORD_RECOVERY event arrived in time. Supabase's
+ * PKCE exchange needs the code-verifier cookie set by the browser that
+ * requested the reset; opening the email in a different browser (or a
+ * different profile) leaves no verifier, so the exchange can never
+ * complete. Reverting to request mode here would send them into an
+ * infinite loop: request a link, open it elsewhere, land back on the
+ * request form, repeat. */
+const CROSS_BROWSER_FAILURE =
+  "This reset link can only be opened in the browser you requested it from. Request a new one here.";
+
+type Mode = "loading" | "recovery" | "request" | "link-error";
 
 /** One component, two modes.
  *
@@ -38,9 +49,15 @@ type Mode = "loading" | "recovery" | "request";
  * arrive via a recovery link. */
 export function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("loading");
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // A `code` param proves this visit came from a reset link (Supabase's PKCE
+  // flow appends it), even before we know whether the exchange can succeed
+  // in this browser.
+  const hasRecoveryCode = searchParams.get("code") !== null;
 
   useEffect(() => {
     const supabase = createClient();
@@ -55,16 +72,24 @@ export function ResetPasswordForm() {
 
     // A direct visit (no recovery link) never fires PASSWORD_RECOVERY, so
     // fall back to request-a-link mode after a short wait rather than
-    // showing "Loading…" forever.
+    // showing "Loading…" forever. But a visit that DOES carry a recovery
+    // code and still hasn't gotten the event means the PKCE exchange can't
+    // complete here — most likely the link was opened in a different
+    // browser than the one that requested it, so the code-verifier cookie
+    // is missing. Reverting to request-a-link mode in that case would loop
+    // forever: request, open elsewhere, land back on request, repeat.
     const timeout = setTimeout(() => {
-      setMode((current) => (current === "loading" ? "request" : current));
+      setMode((current) => {
+        if (current !== "loading") return current;
+        return hasRecoveryCode ? "link-error" : "request";
+      });
     }, RECOVERY_DETECTION_TIMEOUT_MS);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, []);
+  }, [hasRecoveryCode]);
 
   const requestForm = useForm<ResetRequestValues>({
     resolver: zodResolver(resetRequestSchema),
@@ -127,6 +152,10 @@ export function ResetPasswordForm() {
 
   if (mode === "loading") {
     return <p className="text-sm text-neutral-500">Loading…</p>;
+  }
+
+  if (mode === "link-error") {
+    return <AuthMessage kind="error">{CROSS_BROWSER_FAILURE}</AuthMessage>;
   }
 
   if (mode === "recovery") {

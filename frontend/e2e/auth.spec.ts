@@ -37,7 +37,16 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(PASSWORD);
   await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page.getByText(/check your inbox/i)).toBeVisible();
+
+  // This project runs with email confirmation off, so Supabase returns a live
+  // session and the new account is signed in immediately. Telling them to
+  // check an inbox no mail was sent to would strand them on /signup.
+  await expect(page).toHaveURL(/\/account/);
+  await expect(page.getByText(email)).toBeVisible();
+
+  // Sign out, then prove the credentials work for a real sign-in too.
+  await page.getByRole("button", { name: /sign out/i }).click();
+  await expect(page).toHaveURL(/\/login/);
 
   await page.goto("/login");
   await page.getByLabel(/email/i).fill(email);

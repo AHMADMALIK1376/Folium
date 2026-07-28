@@ -13,6 +13,11 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema, type SignupValues } from "@/lib/validation/auth";
 
+/** Shown when a Supabase call throws instead of resolving — a dropped
+ * connection, DNS failure, etc. Kept identical across every auth action so it
+ * can't be used to tell them apart. */
+const NETWORK_FAILURE = "Could not reach the server. Check your connection and try again.";
+
 export function SignupForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -26,16 +31,24 @@ export function SignupForm() {
   const onSubmit = async (values: SignupValues) => {
     setFormError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
-      email: values.email,
-      password: values.password,
-      options: { emailRedirectTo: `${window.location.origin}/callback` },
-    });
 
-    if (error) {
-      setFormError(error.status === 429
-        ? "Too many sign-up attempts. Wait a few minutes and try again."
-        : "Could not create the account. Try again.");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: { emailRedirectTo: `${window.location.origin}/callback` },
+      });
+
+      if (error) {
+        setFormError(error.status === 429
+          ? "Too many sign-up attempts. Wait a few minutes and try again."
+          : "Could not create the account. Try again.");
+        return;
+      }
+    } catch {
+      // Must not reveal anything about whether an account exists, so this
+      // gets the same generic network message as any other failure here.
+      setFormError(NETWORK_FAILURE);
       return;
     }
 

@@ -205,6 +205,37 @@ That reports what it would delete and changes nothing. Add `--yes` to actually d
 removes accounts on `example.com`, `example.org`, and `example.net` — domains RFC 2606 reserves so
 they can never belong to a real person — and their documents and shares go with them via cascade.
 
+### End-to-end tests
+
+Playwright drives a real browser through sign-up, sign-in, the route guard, and sign-out against a
+real Supabase project. It runs locally only — CI holds no Supabase credentials, and supplying them
+would mean putting a database password into GitHub secrets and letting every run create accounts.
+
+```bash
+cd frontend && npm run e2e:install
+```
+
+Start the backend in a second terminal, then:
+
+```bash
+cd frontend && npm run e2e
+```
+
+Playwright starts the frontend dev server itself; the backend it does not, and `/account` calls it.
+
+Browsers download to `D:\AJAIA\Folium\.playwright-browsers`, not the system drive. The path is set
+inside the npm scripts, so it works in any shell without a machine-wide variable.
+
+Two prerequisites live in the Supabase dashboard, not the code:
+
+- **Confirm email must be off** (*Authentication → Sign Up / User Signups → Confirm email*), or a new
+  account cannot sign in until a link in a real inbox is clicked. Re-enable before launch.
+- Free-tier email is rate-limited to a handful per hour, which is why the tests use password sign-up
+  rather than magic links.
+
+Each run creates a real account with a unique `@example.com` address, so runs never collide. Clear
+them with `backend/scripts/clean_test_data.py`.
+
 ### Authentication
 
 Requests must carry a Supabase-issued JWT as `Authorization: Bearer <token>`. There is no

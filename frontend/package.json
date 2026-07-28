@@ -10,7 +10,9 @@
     "build": "next build",
     "start": "next start",
     "test": "node --test test/*.test.ts",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "e2e": "cross-env PLAYWRIGHT_BROWSERS_PATH=D:/AJAIA/Folium/.playwright-browsers playwright test",
+    "e2e:install": "cross-env PLAYWRIGHT_BROWSERS_PATH=D:/AJAIA/Folium/.playwright-browsers playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
@@ -38,6 +40,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -45,6 +48,7 @@
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "cross-env": "^10.1.0",
     "jsdom": "^29.1.1",
     "typescript": "5.4.5",
     "vite": "^6.4.3",

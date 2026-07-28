@@ -114,7 +114,8 @@ consumes for theming. One definition, used by both.
 
 shadcn components are copied into the repository rather than installed as a dependency, so they can
 be edited directly. Only what the auth pages need: `button`, `input`, `label`, `card`, `alert`,
-`form`, `separator`, `sonner`.
+`form`, `separator`. Feedback is rendered inline next to the form rather than as a toast, so a
+screen reader announces it in place and it cannot be missed by a user who looked away.
 
 ### Tokens
 

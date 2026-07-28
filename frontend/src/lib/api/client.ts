@@ -1,13 +1,8 @@
 import { createClient } from "@/lib/supabase/client";
 import { ApiError } from "./errors";
+import type { UserProfile } from "./types";
 
-export interface UserProfile {
-  id: string;
-  email: string;
-  display_name: string;
-  avatar_url: string | null;
-  created_at: string;
-}
+export type { UserProfile } from "./types";
 
 /** Call the FastAPI backend with the current access token.
  *

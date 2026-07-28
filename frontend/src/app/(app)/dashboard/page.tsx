@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
+import { CreateDocumentButton } from "@/components/documents/CreateDocumentButton";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { getDocuments } from "@/lib/api/server";
 import type { DocumentListResponse } from "@/lib/api/types";
@@ -19,9 +20,12 @@ export default async function DashboardPage() {
     <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-neutral-900">Documents</h1>
-        <Link href="/trash" className="text-sm text-neutral-500 hover:text-carmine-500">
-          Trash
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/trash" className="text-sm text-neutral-500 hover:text-carmine-500">
+            Trash
+          </Link>
+          <CreateDocumentButton />
+        </div>
       </div>
 
       <DocumentList

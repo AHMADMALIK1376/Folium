@@ -6,8 +6,18 @@ import { ApiError } from "@/lib/api/errors";
  * 401 and 503 stay distinct deliberately: the backend separates "your session
  * expired" from "the signing keys are unreachable", and collapsing them would
  * make an outage look like every user's credentials failing at once.
+ *
+ * `fallback` covers everything else, and differs per caller — "could not load"
+ * is wrong wording for a failed create. The two cases above do not vary,
+ * because an expired session reads the same whatever the user was attempting.
  */
-export function ApiErrorMessage({ error }: { error: unknown }) {
+export function ApiErrorMessage({
+  error,
+  fallback,
+}: {
+  error: unknown;
+  fallback?: React.ReactNode;
+}) {
   if (error instanceof ApiError && error.status === 503) {
     return (
       <AuthMessage kind="error">
@@ -30,11 +40,15 @@ export function ApiErrorMessage({ error }: { error: unknown }) {
 
   return (
     <AuthMessage kind="error">
-      Could not load your documents.{" "}
-      <a href="/dashboard" className="underline">
-        Try again
-      </a>
-      .
+      {fallback ?? (
+        <>
+          Could not load your documents.{" "}
+          <a href="/dashboard" className="underline">
+            Try again
+          </a>
+          .
+        </>
+      )}
     </AuthMessage>
   );
 }

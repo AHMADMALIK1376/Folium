@@ -1616,7 +1616,7 @@ git commit -m "feat(frontend): add sign-up, password reset, and the auth callbac
 ### Task 8: Middleware guard and the account page
 
 **Files:**
-- Create: `frontend/middleware.ts`
+- Create: `frontend/src/middleware.ts`
 - Create: `frontend/src/app/(app)/layout.tsx`
 - Create: `frontend/src/app/(app)/account/page.tsx`
 - Create: `frontend/src/components/auth/SignOutButton.tsx`
@@ -1628,7 +1628,7 @@ git commit -m "feat(frontend): add sign-up, password reset, and the auth callbac
 
 This task delivers the milestone: `/account` proves the browser, Supabase, and FastAPI all agree on who the user is.
 
-- [ ] **Step 1: Create `frontend/middleware.ts`**
+- [ ] **Step 1: Create `frontend/src/middleware.ts`**
 
 ```ts
 import { NextResponse, type NextRequest } from "next/server";

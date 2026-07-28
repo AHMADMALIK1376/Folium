@@ -60,7 +60,7 @@ src/app/
     layout.tsx          authenticated shell, header, sign-out
     account/page.tsx    profile loaded from GET /api/v1/me
   page.tsx              signed in -> /account, otherwise -> /login
-middleware.ts           guards (app)/*
+src/middleware.ts       guards (app)/* (must live in src/, not the project root)
 ```
 
 Route groups — the parentheses — do not appear in URLs. They exist so the signed-out pages and the
@@ -98,7 +98,7 @@ distinguishable) from a genuine 500.
 
 ### Middleware
 
-`middleware.ts` refreshes the session cookie and guards `(app)/*`. Unauthenticated requests are
+`src/middleware.ts` refreshes the session cookie and guards `(app)/*`. It must sit inside `src/`: Next.js only reads a project-root middleware file when the project has no `src/` directory, and a misplaced file is ignored silently rather than erroring. Unauthenticated requests are
 redirected to `/login` carrying a `redirectTo` parameter, so signing in returns the user where they
 were headed rather than dumping them on a default page.
 

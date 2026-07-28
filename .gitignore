@@ -23,3 +23,9 @@ venv/
 .coverage
 htmlcov/
 *.tsbuildinfo
+
+# Downloads kept on D: rather than the system drive
+.npm-cache/
+.playwright-browsers/
+test-results/
+playwright-report/

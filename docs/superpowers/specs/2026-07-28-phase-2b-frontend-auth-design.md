@@ -194,16 +194,41 @@ is actionable and a generic failure is not.
 |---|---|---|
 | Unit | Vitest | API client: token attachment, typed errors by status |
 | Component | Vitest + React Testing Library | Form validation, error rendering, pending states |
+| End-to-end | Playwright (Chromium only) | Sign up → log in → `/account` → sign out; guard redirect |
 | Type | `tsc --noEmit` | Already in CI |
 
-**Playwright is deliberately excluded.** Its value would be a real sign-up → log-in → account run,
-but that is gated behind email confirmation and free-tier email limits, so it could not run
-unattended in CI regardless. It also downloads several hundred megabytes of browsers. Component
-tests cover the logic that actually breaks; the full flow is verified manually in 2B and becomes a
-better Playwright candidate in 2C, when there is a real dashboard to assert against.
+The Supabase client is mocked in the Vitest layers. Those tests may never require network access or
+real credentials — the same rule 2A's backend suite already follows.
 
-The Supabase client is mocked in tests. No test may require network access or real credentials —
-the same rule 2A's backend suite already follows.
+### Playwright
+
+Runs locally against a real Supabase project, **not in CI**. CI has no Supabase credentials, and
+adding them would mean putting a production database password into GitHub secrets and letting every
+CI run create accounts. The E2E suite is a local pre-merge check instead, and CI keeps its existing
+lint / type-check / unit-test gate.
+
+**Chromium only.** Cross-browser coverage buys little for an auth form and triples the download.
+
+**Two hard prerequisites, both outside the code:**
+
+1. **Email confirmation must be off** in Supabase (*Authentication → Sign In / Providers → Email →
+   Confirm email*). With it on, a new account cannot log in until a link in a real inbox is clicked,
+   which no unattended test can do. Re-enable before launch.
+2. **Free-tier email is rate-limited** to a handful per hour. Tests must therefore use
+   password sign-up rather than magic link, and generate a unique address per run so they stay
+   idempotent — the same lesson that broke the backend suite in 2A, where fixed emails passed once
+   and then collided forever.
+
+Each run creates a real account in the shared database. `backend/scripts/clean_test_data.py`
+removes them; E2E accounts use `@example.com` so that script already matches them.
+
+### Downloads stay on D:
+
+The system drive is short of space, so nothing this project fetches may land on C:. Playwright's
+browsers default to `%LOCALAPPDATA%\ms-playwright`; they are redirected to
+`D:\AJAIA\Folium\.playwright-browsers` via `PLAYWRIGHT_BROWSERS_PATH`, set inside the npm scripts so
+it applies without depending on a machine-wide environment variable. npm's cache is likewise
+redirected to `D:\AJAIA\Folium\.npm-cache` in `frontend/.npmrc`. Both directories are gitignored.
 
 ---
 
@@ -233,4 +258,7 @@ the same rule 2A's backend suite already follows.
 - [ ] Signing out clears the session; `/account` is then unreachable.
 - [ ] Every interactive element is reachable and operable by keyboard, with a visible focus ring.
 - [ ] `npm run build`, `tsc --noEmit`, and the Vitest suite all pass; CI stays green.
+- [ ] The Playwright suite passes locally, and its browsers live under
+      `D:\AJAIA\Folium\.playwright-browsers` — nothing added to `%LOCALAPPDATA%`.
+- [ ] Repeated Playwright runs pass without collisions, the way the backend suite does.
 - [ ] No backend files changed.

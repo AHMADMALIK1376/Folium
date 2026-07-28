@@ -27,6 +27,19 @@ export default function AccountPage() {
       });
   }, []);
 
+  useEffect(() => {
+    // bfcache restores the whole JS heap on Back, without a network request
+    // and without re-running effects — so a signed-out user could otherwise
+    // read the previous user's profile straight off the screen. `persisted`
+    // is true only for a bfcache restore, so a normal load is unaffected.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   if (error) return <AuthMessage kind="error">{error}</AuthMessage>;
   if (!profile) return <p className="text-sm text-neutral-500">Loading…</p>;
 

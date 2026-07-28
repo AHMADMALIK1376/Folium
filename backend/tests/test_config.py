@@ -24,3 +24,29 @@ def test_environment_still_defaults_to_production(monkeypatch):
     an unset ENVIRONMENT must never silently enable development behaviour."""
     monkeypatch.delenv("ENVIRONMENT", raising=False)
     assert Settings(_env_file=None).environment == "production"
+
+
+def test_cors_origins_splits_a_comma_separated_list():
+    s = Settings(_env_file=None, frontend_origin="http://a.test,http://b.test")
+    assert s.cors_origins == ["http://a.test", "http://b.test"]
+
+
+def test_cors_origins_trims_whitespace_and_drops_blanks():
+    # A trailing comma would otherwise yield an empty origin, which
+    # CORSMiddleware treats as a value to match against.
+    s = Settings(_env_file=None, frontend_origin=" http://a.test , , http://b.test ,")
+    assert s.cors_origins == ["http://a.test", "http://b.test"]
+
+
+def test_cors_origins_allows_both_localhost_and_loopback_by_default():
+    """A browser treats localhost and 127.0.0.1 as different origins, and
+    Next.js prints both on startup. Allowing only one rejects the other's
+    preflight with a 400 that looks like a server fault."""
+    s = Settings(_env_file=None)
+    assert "http://localhost:3000" in s.cors_origins
+    assert "http://127.0.0.1:3000" in s.cors_origins
+
+
+def test_a_single_origin_still_works():
+    s = Settings(_env_file=None, frontend_origin="https://folium.app")
+    assert s.cors_origins == ["https://folium.app"]

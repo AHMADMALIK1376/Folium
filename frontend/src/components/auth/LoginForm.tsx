@@ -11,6 +11,7 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeRedirect } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, magicLinkSchema, type LoginValues } from "@/lib/validation/auth";
 
@@ -19,6 +20,11 @@ import { loginSchema, magicLinkSchema, type LoginValues } from "@/lib/validation
  * Distinguishing "wrong password" from "no such account" turns the login form
  * into a tool for discovering who has an account here. */
 const GENERIC_FAILURE = "Those details didn't match an account.";
+
+/** Shown when a Supabase call throws instead of resolving — a dropped
+ * connection, DNS failure, etc. Kept identical across every auth action so it
+ * can't be used to tell them apart. */
+const NETWORK_FAILURE = "Could not reach the server. Check your connection and try again.";
 
 export function LoginForm() {
   const router = useRouter();
@@ -36,16 +42,22 @@ export function LoginForm() {
   const onSubmit = async (values: LoginValues) => {
     setFormError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword(values);
 
-    if (error) {
-      setFormError(error.status === 429
-        ? "Too many attempts. Wait a minute and try again."
-        : GENERIC_FAILURE);
+    try {
+      const { error } = await supabase.auth.signInWithPassword(values);
+
+      if (error) {
+        setFormError(error.status === 429
+          ? "Too many attempts. Wait a minute and try again."
+          : GENERIC_FAILURE);
+        return;
+      }
+    } catch {
+      setFormError(NETWORK_FAILURE);
       return;
     }
 
-    router.push(params.get("redirectTo") ?? "/account");
+    router.push(safeRedirect(params.get("redirectTo")));
     router.refresh();
   };
 
@@ -61,18 +73,33 @@ export function LoginForm() {
     const { email } = parsed.data;
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/callback` },
-    });
 
-    if (error) {
-      setFormError(error.status === 429
-        ? "Too many requests. Wait a few minutes before asking for another link."
-        : "Could not send the link. Try again.");
-      return;
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/callback`,
+          // The login page should never be able to create an account — that's
+          // the sign-up page's job. Without this, Supabase's default
+          // (shouldCreateUser: true) means typing any address here silently
+          // registers it.
+          shouldCreateUser: false,
+        },
+      });
+
+      if (error?.status === 429) {
+        setFormError("Too many requests. Wait a few minutes before asking for another link.");
+        return;
+      }
+
+      // Whether this address has an account or not, show the same
+      // confirmation. With shouldCreateUser: false, Supabase returns an
+      // error for unknown addresses — surfacing that distinctly would turn
+      // this into a tool for discovering who has an account here.
+      setMagicSent(true);
+    } catch {
+      setFormError(NETWORK_FAILURE);
     }
-    setMagicSent(true);
   };
 
   if (magicSent) {

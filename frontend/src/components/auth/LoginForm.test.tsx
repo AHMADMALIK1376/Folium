@@ -4,9 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const refresh = vi.fn();
+// Tests can populate this before rendering to control what
+// `useSearchParams().get(...)` returns; defaults to empty so existing tests
+// are unaffected.
+let searchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, refresh }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
 }));
 
 const signInWithPassword = vi.fn();
@@ -18,7 +22,10 @@ vi.mock("@/lib/supabase/client", () => ({
 const { LoginForm } = await import("./LoginForm");
 
 describe("LoginForm", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParams = new URLSearchParams();
+  });
 
   it("shows a validation error for a malformed email", async () => {
     render(<LoginForm />);
@@ -77,5 +84,54 @@ describe("LoginForm", () => {
     await userEvent.click(screen.getByRole("button", { name: /sign-in link/i }));
 
     expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument();
+  });
+
+  it("ignores an off-origin redirectTo after login", async () => {
+    searchParams = new URLSearchParams({ redirectTo: "https://evil.example.com" });
+    signInWithPassword.mockResolvedValue({ error: null });
+
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "a@b.co");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/account"));
+    expect(push).not.toHaveBeenCalledWith("https://evil.example.com");
+  });
+
+  it("shows the same magic-link confirmation for an unknown address", async () => {
+    signInWithOtp.mockResolvedValue({
+      error: { message: "Signups not allowed for otp", status: 400 },
+    });
+
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "a@b.co");
+    await userEvent.click(screen.getByRole("button", { name: /sign-in link/i }));
+
+    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument();
+    expect(screen.queryByText(/not found|no account|signup/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a network error message when signing in throws", async () => {
+    signInWithPassword.mockRejectedValue(new Error("network down"));
+
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "a@b.co");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach the server/i);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("shows a network error message when the magic link request throws", async () => {
+    signInWithOtp.mockRejectedValue(new Error("network down"));
+
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "a@b.co");
+    await userEvent.click(screen.getByRole("button", { name: /sign-in link/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not reach the server/i);
+    expect(screen.queryByText(/check your inbox/i)).not.toBeInTheDocument();
   });
 });

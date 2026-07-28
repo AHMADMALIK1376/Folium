@@ -153,7 +153,7 @@ so. Both are the first thing a new user meets, so neither may look like a failur
 
 | Situation | Behaviour |
 |---|---|
-| Server fetch returns 401 | Redirect to `/login`. The session expired between middleware and render. |
+| Server fetch returns 401 | Render a message with a sign-in link — deliberately **not** an automatic redirect. Middleware has already judged the caller authenticated, so bouncing to `/login` would let middleware send them straight back to the dashboard, and the two would loop. A link puts the user in control of a disagreement the app cannot resolve on its own. |
 | Server fetch returns 503 | Render an explicit "temporarily unavailable" message, distinct from an auth failure — the distinction 2A deliberately built. |
 | Server fetch fails otherwise | Render an error state with a retry link, never a blank page or a crash. |
 | A mutation fails | Inline message beside the action, in `carmine-700` with an icon. The list is not optimistically updated, so nothing to roll back. |

@@ -41,6 +41,11 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   // This project runs with email confirmation off, so Supabase returns a live
   // session and the new account is signed in immediately. Telling them to
   // check an inbox no mail was sent to would strand them on /signup.
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  // The profile now lives one click away rather than being the landing page,
+  // so this also proves the header keeps it reachable.
+  await page.getByRole("link", { name: /^account$/i }).click();
   await expect(page).toHaveURL(/\/account/);
   await expect(page.getByText(email)).toBeVisible();
 
@@ -53,7 +58,9 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   await page.getByLabel(/password/i).fill(PASSWORD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 
-  await expect(page).toHaveURL(/\/account/);
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto("/account");
   // This is the milestone: the address came back from FastAPI, which verified
   // the Supabase token and provisioned the user row before answering.
   await expect(page.getByText(email)).toBeVisible();
@@ -67,6 +74,6 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
 });
 
 test("a guarded page returns you where you were headed", async ({ page }) => {
-  await page.goto("/account");
-  await expect(page).toHaveURL(/redirectTo=%2Faccount/);
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/redirectTo=%2Fdashboard/);
 });

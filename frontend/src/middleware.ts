@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PROTECTED = ["/account", "/dashboard"];
+const PROTECTED = ["/account", "/dashboard", "/trash"];
 
 // The v1 app is retired but still compiled until Phase 2C deletes it. Its
 // login route mints a session for a seeded account with no password, so

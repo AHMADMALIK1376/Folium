@@ -90,4 +90,51 @@ describe("apiFetch", () => {
     );
     await expect(apiFetch("/x")).resolves.toBeNull();
   });
+
+  it("sets a JSON content type for an ordinary body", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    await apiFetch("/x", { method: "POST", body: JSON.stringify({ a: 1 }) });
+
+    expect((fetchMock.mock.calls[0][1]?.headers as Record<string, string>)[
+      "Content-Type"
+    ]).toBe("application/json");
+  });
+
+  it("sets no content type for a FormData body", async () => {
+    // The browser generates multipart/form-data plus the boundary parameter
+    // that delimits the parts. Hardcoding application/json makes the server
+    // reject the body it was actually sent.
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    const body = new FormData();
+    body.append("file", new File(["hello"], "a.md", { type: "text/markdown" }));
+    await apiFetch("/api/v1/documents/import", { method: "POST", body });
+
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+    // The token still has to be there — that is the whole reason sendBeacon
+    // cannot be used for uploads either.
+    expect(headers.Authorization).toBe("Bearer token-abc");
+  });
+
+  it("still lets an explicit content type win for a non-FormData body", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    await apiFetch("/x", {
+      method: "POST",
+      body: "raw",
+      headers: { "Content-Type": "text/plain" },
+    });
+
+    expect((fetchMock.mock.calls[0][1]?.headers as Record<string, string>)[
+      "Content-Type"
+    ]).toBe("text/plain");
+  });
 });

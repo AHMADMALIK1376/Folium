@@ -22,11 +22,18 @@ export async function apiFetch<T>(
     throw new ApiError(0, "Not signed in");
   }
 
+  // A multipart upload must not carry a hardcoded content type: the browser
+  // generates multipart/form-data along with the boundary parameter that
+  // delimits the parts, and overriding it makes the server reject the body it
+  // was actually sent. Every other body stays JSON, as before.
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+
   const base = process.env.NEXT_PUBLIC_API_URL ?? "";
   const response = await fetch(`${base}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...init.headers,
       Authorization: `Bearer ${session.access_token}`,
     },

@@ -90,7 +90,25 @@ export function useAutosave({
     void run({ keepalive: true });
   }, [run]);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  // Flush on unmount rather than merely cancelling the timer.
+  //
+  // beforeunload and visibilitychange cover the page going away, but not the
+  // commonest exit of all: clicking a link inside the app. That is a client-side
+  // navigation — no unload event, no visibility change — so a cancelled timer
+  // silently discarded whatever the user typed in the last 800ms. Leaving the
+  // editor via "← Documents" immediately after renaming lost the rename.
+  //
+  // Fire-and-forget by necessity: the component is going away, so there is
+  // nobody left to show an error to. keepalive means the request completes even
+  // if a full navigation follows.
+  useEffect(() => {
+    return () => {
+      if (pending.current !== null) {
+        void saveRef.current(pending.current, { keepalive: true });
+      }
+      clearTimer();
+    };
+  }, [clearTimer]);
 
   return { status, error, schedule, flush };
 }

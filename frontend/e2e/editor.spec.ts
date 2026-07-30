@@ -67,7 +67,19 @@ test("renaming in the editor shows up on the dashboard", async ({ page }) => {
   await openNewDocument(page);
 
   const titleInput = page.getByRole("textbox", { name: /document title/i });
-  await titleInput.fill(title);
+
+  // Waiting on the PATCH, not on the status text: the status starts at "Saved",
+  // so asserting it can match the state before the edit was even registered —
+  // which is exactly how the lost-rename-on-navigate bug hid.
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/v1/documents/") &&
+        response.request().method() === "PATCH" &&
+        response.ok(),
+    ),
+    titleInput.fill(title),
+  ]);
   await expect(page.getByRole("status")).toHaveText(/^saved$/i);
 
   await page.getByRole("link", { name: /documents/i }).first().click();

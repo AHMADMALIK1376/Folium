@@ -152,11 +152,39 @@ describe("useAutosave", () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 
-  it("cancels a pending save when unmounted", async () => {
+  it("saves a pending change when unmounted rather than dropping it", async () => {
+    // Clicking a link inside the app is a client-side navigation: no unload
+    // event fires, so the unmount is the only signal there is. Cancelling here
+    // silently discarded whatever was typed in the last 800ms — renaming a
+    // document and clicking straight back to the dashboard lost the rename.
     const save = vi.fn().mockResolvedValue(undefined);
     const { result, unmount } = renderHook(() => useAutosave({ save }));
 
     act(() => result.current.schedule({ title: "x" }));
+    unmount();
+
+    expect(save).toHaveBeenCalledWith({ title: "x" }, { keepalive: true });
+  });
+
+  it("fires nothing on unmount when everything is already saved", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = renderHook(() => useAutosave({ save }));
+
+    act(() => result.current.schedule({ title: "x" }));
+    await settle();
+    expect(save).toHaveBeenCalledTimes(1);
+
+    unmount();
+
+    // The pending patch was cleared by the successful save, so unmounting must
+    // not repeat it.
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fire a stale save after the timer was already cancelled", async () => {
+    const save = vi.fn().mockResolvedValue(undefined);
+    const { unmount } = renderHook(() => useAutosave({ save }));
+
     unmount();
     await settle();
 

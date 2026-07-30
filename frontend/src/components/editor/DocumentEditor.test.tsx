@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/errors";
 import type { DocumentDetail, Permission } from "@/lib/api/types";
 
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
+
 const updateDocument = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   updateDocument: (...args: unknown[]) => updateDocument(...args),

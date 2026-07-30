@@ -4,6 +4,7 @@ import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
@@ -24,13 +25,27 @@ function canEdit(document: DocumentDetail) {
 }
 
 export function DocumentEditor({ document }: { document: DocumentDetail }) {
+  const router = useRouter();
   const editable = canEdit(document);
   const [title, setTitle] = useState(document.title);
 
   const save = useCallback(
-    (patch: DocumentPatch, init?: RequestInit) =>
-      updateDocument(document.id, patch, init),
-    [document.id],
+    async (patch: DocumentPatch, init?: RequestInit) => {
+      const saved = await updateDocument(document.id, patch, init);
+
+      // Only for a rename, and only after it succeeded. The dashboard shows
+      // titles, and Next serves it from the client Router Cache — prefetched
+      // when this page loaded, so from before the rename. Without this,
+      // renaming and clicking straight back showed the old title.
+      //
+      // Not done for content saves: nothing outside this page displays the body,
+      // and refreshing on every keystroke batch would re-run the server render
+      // mid-edit for no one's benefit.
+      if (patch.title !== undefined) router.refresh();
+
+      return saved;
+    },
+    [document.id, router],
   );
   const { status, error, schedule, flush } = useAutosave({ save });
 
@@ -107,6 +122,12 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
       <div className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-3">
         <Link
           href="/dashboard"
+          // Not prefetched, deliberately. A prefetch of the dashboard happens
+          // when this page loads — before anything is renamed — and Next would
+          // then serve that payload on click, showing the old title. The
+          // dashboard is one navigation away and server-renders quickly; a
+          // stale title is a worse trade than a few hundred milliseconds.
+          prefetch={false}
           className="text-sm text-neutral-500 hover:text-carmine-500"
         >
           ← Documents

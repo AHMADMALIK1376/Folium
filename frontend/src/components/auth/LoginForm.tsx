@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { safeRedirect } from "@/lib/auth/redirect";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema, magicLinkSchema, type LoginValues } from "@/lib/validation/auth";
 
@@ -27,6 +28,9 @@ const GENERIC_FAILURE = "Those details didn't match an account.";
 const NETWORK_FAILURE = "Could not reach the server. Check your connection and try again.";
 
 export function LoginForm() {
+  // Keeps the password out of the URL: before hydration a submit is a native
+  // GET carrying every field as a query parameter. See useHydrated.
+  const hydrated = useHydrated();
   const router = useRouter();
   const params = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
@@ -151,11 +155,11 @@ export function LoginForm() {
           )}
         </div>
 
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || !hydrated}>
           {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
 
-        <Button type="button" variant="ghost" disabled={sendingLink} onClick={sendMagicLink}>
+        <Button type="button" variant="ghost" disabled={sendingLink || !hydrated} onClick={sendMagicLink}>
           {sendingLink ? "Sending…" : "Email me a sign-in link instead"}
         </Button>
       </div>

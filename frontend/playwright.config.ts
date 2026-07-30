@@ -25,9 +25,17 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run dev",
+    // A production build, not `next dev`, and deliberately.
+    //
+    // In dev, Next compiles each route on its first request, so the first sign-in
+    // of a run waits seconds for /dashboard to build — long enough to look like a
+    // failure, and long enough that the pre-hydration window on the auth forms is
+    // wide open. Both cost real debugging time across 2C-ii and 2C-iii. A build
+    // costs about twenty seconds once, and then every route is already compiled,
+    // which is also what a user actually gets.
+    command: "npm run build && npm run start",
     url: "http://localhost:3000",
     reuseExistingServer: true,
-    timeout: 120_000,
+    timeout: 300_000,
   },
 });

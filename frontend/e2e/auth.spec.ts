@@ -73,6 +73,28 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   await expect(page).toHaveURL(/\/login/);
 });
 
+test("credentials never reach a URL", async ({ page }) => {
+  // A form whose only submit path is an onSubmit handler has no handler until
+  // React hydrates, and a native submit with no method is a GET — so a click in
+  // that window puts the password in the query string, then in browser history
+  // and every access log along the way. The submit button is disabled until
+  // hydration to close that window; this asserts the outcome rather than the
+  // mechanism.
+  const seen: string[] = [];
+  page.on("framenavigated", (frame) => seen.push(frame.url()));
+
+  await page.goto("/signup");
+  await page.getByLabel(/email/i).fill(uniqueEmail());
+  await page.getByLabel(/password/i).fill(PASSWORD);
+  await page.getByRole("button", { name: /create account/i }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  for (const url of [...seen, page.url()]) {
+    expect(url).not.toContain("password");
+    expect(url).not.toContain(PASSWORD);
+  }
+});
+
 test("a guarded page returns you where you were headed", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/redirectTo=%2Fdashboard/);

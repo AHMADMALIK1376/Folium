@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_REDIRECT } from "@/lib/auth/redirect";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema, type SignupValues } from "@/lib/validation/auth";
 
@@ -21,6 +22,9 @@ import { signupSchema, type SignupValues } from "@/lib/validation/auth";
 const NETWORK_FAILURE = "Could not reach the server. Check your connection and try again.";
 
 export function SignupForm() {
+  // Keeps the password out of the URL: before hydration a submit is a native
+  // GET carrying every field as a query parameter. See useHydrated.
+  const hydrated = useHydrated();
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -129,7 +133,7 @@ export function SignupForm() {
           )}
         </div>
 
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || !hydrated}>
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </div>

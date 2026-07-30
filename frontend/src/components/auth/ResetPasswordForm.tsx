@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DEFAULT_REDIRECT } from "@/lib/auth/redirect";
+import { useHydrated } from "@/lib/hooks/useHydrated";
 import { createClient } from "@/lib/supabase/client";
 import {
   newPasswordSchema,
@@ -49,6 +50,9 @@ type Mode = "loading" | "recovery" | "request" | "link-error";
  * who simply navigates to /reset-password has a session too, but didn't
  * arrive via a recovery link. */
 export function ResetPasswordForm() {
+  // Keeps the password out of the URL: before hydration a submit is a native
+  // GET carrying every field as a query parameter. See useHydrated.
+  const hydrated = useHydrated();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("loading");
@@ -200,7 +204,7 @@ export function ResetPasswordForm() {
               </p>
             )}
           </div>
-          <Button type="submit" disabled={updateForm.formState.isSubmitting}>
+          <Button type="submit" disabled={updateForm.formState.isSubmitting || !hydrated}>
             {updateForm.formState.isSubmitting ? "Saving…" : "Set new password"}
           </Button>
         </div>
@@ -230,7 +234,7 @@ export function ResetPasswordForm() {
             </p>
           )}
         </div>
-        <Button type="submit" disabled={requestForm.formState.isSubmitting}>
+        <Button type="submit" disabled={requestForm.formState.isSubmitting || !hydrated}>
           {requestForm.formState.isSubmitting ? "Sending…" : "Email me a reset link"}
         </Button>
       </div>

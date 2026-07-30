@@ -3,17 +3,18 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: rebuilding for production — through Phase 2C-i.**
+> **Status: rebuilding for production — through Phase 2C-ii.**
 > Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
 >
 > **Working on the v2 stack today:** a separated `frontend/` (Next.js) and `backend/` (FastAPI) on
 > PostgreSQL with SQLAlchemy + Alembic and CI; real sign-up and sign-in through Supabase Auth, with
-> the backend verifying every JWT against Supabase's published keys; and a server-rendered dashboard
-> and trash view where you can create a document, delete it with a confirmation, and restore it.
+> the backend verifying every JWT against Supabase's published keys; a server-rendered dashboard and
+> trash view where you can create a document, delete it with a confirmation, and restore it; and a
+> TipTap editor that opens a document, renames it, and autosaves it as JSON.
 >
-> **Not yet rebuilt:** the editor. Opening a document dead-ends today — rich-text editing, sharing,
-> and file import still exist only in the v1 code, which is compiled but firewalled off behind a 404
-> because its login route minted sessions with no password. The editor is the next phase.
+> **Not yet rebuilt:** sharing and file import. Both still exist only in the v1 code, which is
+> compiled but firewalled off behind a 404 because its login route minted sessions with no password.
+> They return in Phase 2C-iii, which also deletes that code.
 
 ---
 
@@ -25,8 +26,8 @@ share them with other people.
 | [2A](docs/superpowers/plans/2026-07-27-phase-2a-backend-auth.md) | Backend verifies Supabase JWTs; no development bypass | Done |
 | [2B](docs/superpowers/plans/2026-07-28-phase-2b-frontend-auth.md) | Design system, sign-up / sign-in / password reset, route guard, `/account` | Done |
 | [2C-i](docs/superpowers/plans/2026-07-28-phase-2c-i-dashboard.md) | Dashboard and trash on FastAPI: create, delete, restore | Done |
-| 2C-ii | The editor: open a document, edit it, autosave as TipTap JSON | Next |
-| 2C-iii | Sharing with permission levels, file import, and deleting all v1 code | After |
+| [2C-ii](docs/superpowers/plans/2026-07-30-phase-2c-ii-editor.md) | The editor: open a document, edit it, rename it, autosave as TipTap JSON | Done |
+| 2C-iii | Sharing with permission levels, file import, and deleting all v1 code | Next |
 
 Real-time collaboration and version history come after 2C. See the
 [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for the full
@@ -39,7 +40,7 @@ v2 design.
 | Architecture | One Next.js app, frontend + API together | Separate Next.js frontend and FastAPI backend |
 | Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth ✅ |
 | Database | Local SQLite file | PostgreSQL on Supabase ✅ |
-| Content storage | HTML string | TipTap JSON |
+| Content storage | HTML string | TipTap JSON ✅ |
 | Sharing | Binary — has access or doesn't | View / comment / edit permissions |
 | Collaboration | Autosave, refresh to see others' edits | Live multi-cursor editing |
 | Deletion | Permanent | Soft delete with a trash folder ✅ |
@@ -52,7 +53,7 @@ v2 design.
 The product, with what the rebuild has reached so far:
 
 - Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
-  bulleted/numbered lists — with autosave. *Creating works; editing is Phase 2C-ii.*
+  bulleted/numbered lists — with autosave. *Live.*
 - Import a `.txt` or `.md` file as a new document. *Returns in 2C-iii.*
 - Share a document with another user; the dashboard separates documents you own from documents
   shared with you. *The split dashboard is live; the sharing UI returns in 2C-iii.*
@@ -73,8 +74,8 @@ The product, with what the rebuild has reached so far:
 | Real-time | Managed collaboration service |
 | Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
-Everything above is in place except TipTap, which is installed but not yet wired to the backend
-(2C-ii), and real-time, which comes after 2C.
+Everything above is in place except real-time collaboration, which comes after 2C. Editing today is
+last-write-wins: two people in one document overwrite each other, exactly as in v1.
 
 Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
 
@@ -103,11 +104,12 @@ cd frontend && npm run start
 
 ### v1 is still in the tree
 
-`frontend/src/app/api/**` and `frontend/src/app/documents/[id]` are v1 code, kept compiling until
-Phase 2C-iii deletes them. Middleware returns 404 for both — v1's login route minted a session for a
-seeded account with no password, so leaving it reachable would hand anyone the old data layer. The
-three seeded accounts (`alice@`, `bob@`, `carol@example.com`) are no longer usable, and the v1 SQLite
-file at `data/app.sqlite` is no longer read by anything you can reach.
+`frontend/src/app/api/**`, plus the unreferenced v1 components (`DocumentEditorShell`, `Editor`,
+`ShareModal`, `TopBar`), are v1 code kept compiling until Phase 2C-iii deletes them. Middleware
+returns 404 for `/api/` — v1's login route minted a session for a seeded account with no password, so
+leaving it reachable would hand anyone the old data layer. The three seeded accounts (`alice@`,
+`bob@`, `carol@example.com`) are no longer usable, and the v1 SQLite file at `data/app.sqlite` is no
+longer read by anything you can reach.
 
 Its test suite still runs, and still guards the file-import conversion the rebuild will reuse:
 
@@ -133,7 +135,7 @@ server.
 ```
 frontend/               Next.js application
   src/app/(auth)/          sign-in, sign-up, password reset, OAuth callback
-  src/app/(app)/           dashboard, trash, account — behind the route guard
+  src/app/(app)/           dashboard, trash, editor, account — behind the route guard
   src/app/api/             v1 API routes, retired and 404'd until 2C-iii
   src/components/          React components (ui/ is shadcn, on React 18 refs)
   src/lib/                 API clients, Supabase clients, validation, file import
@@ -222,9 +224,9 @@ they can never belong to a real person — and their documents and shares go wit
 
 ### End-to-end tests
 
-Playwright drives a real browser through sign-up, sign-in, the route guard, and sign-out, then
-through creating a document, deleting it, finding it in the trash, and restoring it — all against a
-real Supabase project. It runs locally only — CI holds no Supabase credentials, and supplying them
+Playwright drives a real browser through sign-up, sign-in, the route guard, and sign-out; creating a
+document, deleting it, finding it in the trash, and restoring it; and opening a document, typing,
+reloading to prove the text persisted, and renaming it — all against a real Supabase project. It runs locally only — CI holds no Supabase credentials, and supplying them
 would mean putting a database password into GitHub secrets and letting every run create accounts.
 
 ```bash

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ApiError } from "./errors";
-import type { DocumentListResponse, DocumentSummary } from "./types";
+import type { DocumentDetail, DocumentListResponse, DocumentSummary } from "./types";
 
 /** Call the Folium API from a Server Component.
  *
@@ -63,4 +63,13 @@ export function getDocuments(): Promise<DocumentListResponse> {
 
 export function getTrash(): Promise<DocumentSummary[]> {
   return serverApiFetch<DocumentSummary[]>("/api/v1/documents/trash");
+}
+
+/** Fetch one document, with its content and the caller's permission on it.
+ *
+ * Raises ApiError(404) both when the document does not exist and when the
+ * caller may not see it — the backend conflates the two so the API cannot be
+ * used to discover which documents exist. */
+export function getDocument(id: string): Promise<DocumentDetail> {
+  return serverApiFetch<DocumentDetail>(`/api/v1/documents/${id}`);
 }

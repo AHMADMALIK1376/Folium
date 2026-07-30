@@ -9,8 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test test/*.test.ts",
-    "test:unit": "vitest run",
+    "test": "vitest run",
     "e2e": "cross-env PLAYWRIGHT_BROWSERS_PATH=D:/AJAIA/Folium/.playwright-browsers playwright test",
     "e2e:install": "cross-env PLAYWRIGHT_BROWSERS_PATH=D:/AJAIA/Folium/.playwright-browsers playwright install chromium"
   },

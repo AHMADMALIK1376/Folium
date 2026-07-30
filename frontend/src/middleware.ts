@@ -4,22 +4,14 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 const PROTECTED = ["/account", "/dashboard", "/documents", "/trash"];
 
-// The v1 app is retired but still compiled until Phase 2C-iii deletes it. Its
-// login route mints a session for a seeded account with no password, so
-// leaving these reachable would hand anyone full access to the old data
-// layer. 404 rather than 403: their existence is not worth advertising.
-//
-// `/documents` used to be here too, for the v1 editor. Phase 2C-ii replaced
-// that page, so the path is now protected rather than denied — but `/api/`
-// must stay, because those routes are still the v1 ones.
-const RETIRED = ["/api/"];
+// There is no deny-list any more. Phases 2B and 2C carried one so the retired
+// v1 routes returned 404 — its login route minted a session for a seeded
+// account with no password — but Phase 2C-iii deleted those routes outright,
+// and a list guarding paths that no longer exist is worse than none: it reads
+// as though something still needs guarding.
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  if (RETIRED.some((p) => pathname.startsWith(p))) {
-    return new NextResponse(null, { status: 404 });
-  }
 
   const { response, user } = await updateSession(request);
 

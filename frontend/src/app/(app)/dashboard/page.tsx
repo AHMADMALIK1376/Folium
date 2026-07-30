@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { CreateDocumentButton } from "@/components/documents/CreateDocumentButton";
+import { DeleteDocumentDialog } from "@/components/documents/DeleteDocumentDialog";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { getDocuments } from "@/lib/api/server";
 import type { DocumentListResponse } from "@/lib/api/types";
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
         title="Your documents"
         documents={data.owned}
         emptyMessage="You have no documents yet."
+        renderAction={(document) => <DeleteDocumentDialog document={document} />}
       />
 
       {/* No delete action on shared documents: only an owner may delete, which

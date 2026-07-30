@@ -36,6 +36,24 @@ export interface TipTapDoc {
  *  derives it by comparing owner_id to the caller. */
 export type Permission = "owner" | "edit" | "comment" | "view";
 
+/** What an owner may grant today.
+ *
+ * The backend also accepts "comment", but commenting is not built, so granting
+ * it would promise a capability that does not exist — the collaborator would
+ * find a document they can neither comment on nor edit. An existing comment
+ * share is still displayed faithfully; see Permission. */
+export type GrantablePermission = "view" | "edit";
+
+export interface Share {
+  user_id: string;
+  email: string;
+  display_name: string;
+  /** Not narrowed to Permission: the column is a string, and a value this
+   *  client does not recognise must display as-is rather than crash. */
+  permission: string;
+  created_at: string;
+}
+
 export interface DocumentDetail extends DocumentSummary {
   content: TipTapDoc;
   permission: Permission;

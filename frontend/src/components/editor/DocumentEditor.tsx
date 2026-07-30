@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
+import { ShareDialog } from "@/components/documents/ShareDialog";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
@@ -126,6 +127,11 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
         )}
 
         {editable && <SaveStatus status={status} />}
+
+        {/* Owners only, not editors: the backend answers 404 to share mutations
+            from anyone but the owner, so an editor given this could only ever
+            collect errors. */}
+        {document.permission === "owner" && <ShareDialog documentId={document.id} />}
       </div>
 
       {!editable && (

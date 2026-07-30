@@ -3,41 +3,63 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: rebuilding for production — Phase 1 implemented.**
+> **Status: rebuilding for production — through Phase 2C-i.**
 > Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
-> **Phase 1 of the v2 rebuild is implemented**: a separated `frontend/` (Next.js) and `backend/`
-> (FastAPI) with PostgreSQL, SQLAlchemy + Alembic, document/sharing/import APIs, and CI. Authentication
-> uses real Supabase JWT verification (Phase 2A) — the frontend still runs the old v1 code and is
-> not yet connected to the backend. Frontend auth pages, the design system, and the FastAPI
-> cut-over remain upcoming phases. See
-> [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) and the
-> [Phase 1 implementation plan](docs/superpowers/plans/2026-07-25-phase-1-foundation.md).
+>
+> **Working on the v2 stack today:** a separated `frontend/` (Next.js) and `backend/` (FastAPI) on
+> PostgreSQL with SQLAlchemy + Alembic and CI; real sign-up and sign-in through Supabase Auth, with
+> the backend verifying every JWT against Supabase's published keys; and a server-rendered dashboard
+> and trash view where you can create a document, delete it with a confirmation, and restore it.
+>
+> **Not yet rebuilt:** the editor. Opening a document dead-ends today — rich-text editing, sharing,
+> and file import still exist only in the v1 code, which is compiled but firewalled off behind a 404
+> because its login route minted sessions with no password. The editor is the next phase.
 
 ---
 
-## Where things stand
+## Rebuild progress
 
-| | v1 (in this repo today) | v2 (designed, being built) |
+| Phase | Deliverable | Status |
+|---|---|---|
+| [1](docs/superpowers/plans/2026-07-25-phase-1-foundation.md) | Split frontend and backend; PostgreSQL, SQLAlchemy + Alembic, document/sharing/import APIs, CI | Done |
+| [2A](docs/superpowers/plans/2026-07-27-phase-2a-backend-auth.md) | Backend verifies Supabase JWTs; no development bypass | Done |
+| [2B](docs/superpowers/plans/2026-07-28-phase-2b-frontend-auth.md) | Design system, sign-up / sign-in / password reset, route guard, `/account` | Done |
+| [2C-i](docs/superpowers/plans/2026-07-28-phase-2c-i-dashboard.md) | Dashboard and trash on FastAPI: create, delete, restore | Done |
+| 2C-ii | The editor: open a document, edit it, autosave as TipTap JSON | Next |
+| 2C-iii | Sharing with permission levels, file import, and deleting all v1 code | After |
+
+Real-time collaboration and version history come after 2C. See the
+[foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for the full
+v2 design.
+
+## v1 versus v2
+
+| | v1 (retired, still compiled) | v2 (being built) |
 |---|---|---|
 | Architecture | One Next.js app, frontend + API together | Separate Next.js frontend and FastAPI backend |
-| Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth |
-| Database | Local SQLite file | PostgreSQL on Supabase |
+| Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth ✅ |
+| Database | Local SQLite file | PostgreSQL on Supabase ✅ |
 | Content storage | HTML string | TipTap JSON |
 | Sharing | Binary — has access or doesn't | View / comment / edit permissions |
 | Collaboration | Autosave, refresh to see others' edits | Live multi-cursor editing |
-| Deletion | Permanent | Soft delete with a trash folder |
+| Deletion | Permanent | Soft delete with a trash folder ✅ |
 | History | None | Version snapshots with restore |
+
+✅ marks what is built and working today.
 
 ## What it does
 
-- Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
-  bulleted/numbered lists — with autosave.
-- Import a `.txt` or `.md` file as a new document.
-- Share a document with another user; the dashboard separates documents you own from documents
-  shared with you.
-- Everything persists and survives a refresh or a server restart.
+The product, with what the rebuild has reached so far:
 
-## Planned stack (v2)
+- Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
+  bulleted/numbered lists — with autosave. *Creating works; editing is Phase 2C-ii.*
+- Import a `.txt` or `.md` file as a new document. *Returns in 2C-iii.*
+- Share a document with another user; the dashboard separates documents you own from documents
+  shared with you. *The split dashboard is live; the sharing UI returns in 2C-iii.*
+- Delete a document and restore it from the trash. *Live.*
+- Everything persists and survives a refresh or a server restart. *Live.*
+
+## The v2 stack
 
 | Layer | Technology |
 |---|---|
@@ -51,63 +73,52 @@ share them with other people.
 | Real-time | Managed collaboration service |
 | Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
+Everything above is in place except TipTap, which is installed but not yet wired to the backend
+(2C-ii), and real-time, which comes after 2C.
+
 Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
 
-## Running v1 locally
+## Running it locally
 
-The code in the repository right now is v1.
-
-### Requirements
-
-- **Node.js >= 22.5.0** — v1 uses `node:sqlite`, a built-in module available without a flag from
-  Node 22.5. Check with `node -v`.
-- No external database, API keys, or paid services.
+Requires **Python 3.12+** and **Node 22.5+**. Docker is optional. The backend needs a Supabase
+project — see [Development](#development) below for that and for the database setup, then start the
+frontend:
 
 ```bash
-npm install
-npm run dev
+cd frontend && npm install && npm run dev
 ```
 
-Open http://localhost:3000. You'll land on a login screen with three seeded accounts — click any one
-to continue. The database is created automatically at `data/app.sqlite` on first run and pre-seeded
-with example documents.
+Open http://localhost:3000. There are no seeded accounts and no click-to-continue login: sign up
+with an email and a password, and you land on your dashboard.
 
-To reset all data, stop the server and delete `data/app.sqlite*`.
-
-### Production build
+The frontend also builds and runs in production mode from `frontend/`:
 
 ```bash
-npm run build
+cd frontend && npm run build
 ```
 
 ```bash
-npm run start
+cd frontend && npm run start
 ```
 
-### Tests
+### v1 is still in the tree
+
+`frontend/src/app/api/**` and `frontend/src/app/documents/[id]` are v1 code, kept compiling until
+Phase 2C-iii deletes them. Middleware returns 404 for both — v1's login route minted a session for a
+seeded account with no password, so leaving it reachable would hand anyone the old data layer. The
+three seeded accounts (`alice@`, `bob@`, `carol@example.com`) are no longer usable, and the v1 SQLite
+file at `data/app.sqlite` is no longer read by anything you can reach.
+
+Its test suite still runs, and still guards the file-import conversion the rebuild will reuse:
 
 ```bash
-npm test
+cd frontend && npm test
 ```
 
-Runs Node's built-in test runner against `test/*.test.ts` — covering document access control
-(owner / shared / denied), request validation schemas, and file-import conversion.
+Node's built-in test runner against `test/*.test.ts` — document access control (owner / shared /
+denied), request validation schemas, and file-import conversion.
 
-## Test accounts (v1)
-
-v1 uses mocked auth, so there is no sign-up flow. Pick any of these on the login screen:
-
-| Name | Email |
-|---|---|
-| Alice Chen | alice@example.com |
-| Bob Martinez | bob@example.com |
-| Carol Singh | carol@example.com |
-
-Alice and Bob each start with one seeded document. Bob's "Q3 Roadmap" is pre-shared with Alice, so
-the sharing UI has something to show immediately. To test sharing yourself: log in as one user, open
-a document you own, click **Share**, and enter another account's email.
-
-## File upload (v1)
+## File upload (v1 — returns in 2C-iii)
 
 Supported types: **`.txt` and `.md`/`.markdown` only**, max 2MB — enforced both in the UI and on the
 server.
@@ -120,11 +131,15 @@ server.
 ## Repository layout
 
 ```
-frontend/               Next.js application (v1 today, v2 UI going forward)
-  src/app/                 pages + API routes
-  src/components/          React components
-  src/lib/                 db, repo, auth, validation, file import
-  test/                    frontend test suite
+frontend/               Next.js application
+  src/app/(auth)/          sign-in, sign-up, password reset, OAuth callback
+  src/app/(app)/           dashboard, trash, account — behind the route guard
+  src/app/api/             v1 API routes, retired and 404'd until 2C-iii
+  src/components/          React components (ui/ is shadcn, on React 18 refs)
+  src/lib/                 API clients, Supabase clients, validation, file import
+  src/middleware.ts        route guard — must live in src/, not the project root
+  test/                    v1 test suite (node --test)
+  e2e/                     Playwright specs
 backend/                FastAPI application (v2)
   app/api/                 route handlers
   app/core/                exceptions, constants
@@ -156,7 +171,7 @@ These are the reasons v2 exists:
 - **No version history, no trash, no undo-delete.**
 - **Local SQLite file** — requires a persistent disk, so it cannot scale horizontally.
 
-## Development (v2)
+## Development
 
 Requires Python 3.12+ and Node 22.5+. Docker is optional.
 
@@ -207,7 +222,8 @@ they can never belong to a real person — and their documents and shares go wit
 
 ### End-to-end tests
 
-Playwright drives a real browser through sign-up, sign-in, the route guard, and sign-out against a
+Playwright drives a real browser through sign-up, sign-in, the route guard, and sign-out, then
+through creating a document, deleting it, finding it in the trash, and restoring it — all against a
 real Supabase project. It runs locally only — CI holds no Supabase credentials, and supplying them
 would mean putting a database password into GitHub secrets and letting every run create accounts.
 
@@ -221,7 +237,12 @@ Start the backend in a second terminal, then:
 cd frontend && npm run e2e
 ```
 
-Playwright starts the frontend dev server itself; the backend it does not, and `/account` calls it.
+Playwright starts the frontend dev server itself; the backend it does not, and every page behind the
+guard calls it.
+
+The timeouts are raised above Playwright's defaults on purpose: each protected page is server-rendered
+from a FastAPI call to a hosted database, and the App Router commits a URL only once the destination's
+payload has arrived, so a sign-in landing legitimately takes several seconds.
 
 Browsers download to `D:\AJAIA\Folium\.playwright-browsers`, not the system drive. The path is set
 inside the npm scripts, so it works in any shell without a machine-wide variable.
@@ -262,4 +283,7 @@ merge, and Vercel builds a preview deployment for every PR.
 - [DEPLOY.md](DEPLOY.md) — deployment guide
 - [Foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) — the full
   v2 design
+- [docs/superpowers/specs/](docs/superpowers/specs/) — a design spec per phase
+- [docs/superpowers/plans/](docs/superpowers/plans/) — the implementation plan each phase was built
+  from, task by task
 - [docs/archive/](docs/archive/) — original interview submission notes

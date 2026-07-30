@@ -286,6 +286,8 @@ Expected: **no output** other than matches inside the files being deleted. A hit
 
 Remove the `test` script (`node --test test/*.test.ts` — the directory is gone). Drop the `node:sqlite` justification from `engines`, keeping `>=22.5.0` as Next's floor. Consider renaming `test:unit` to `test`, but only if every reference is updated in the same commit — CI, README, and the plans.
 
+**Done, and `test:unit` was renamed to `test`.** That also fixes CI without editing the command it runs: the workflow already invoked `npm test`, which now resolves to Vitest. Earlier plans still say `npm run test:unit`; they are records of what was run at the time and are left alone.
+
 - [ ] **Step 5: Fix CI — it has been running the wrong suite**
 
 `.github/workflows/frontend.yml` runs `npm test`, the v1 suite, and never runs Vitest. Change that step to run `npm run test:unit`. Without this, deleting v1 leaves CI running no frontend tests at all.

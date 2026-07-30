@@ -1,7 +1,8 @@
 # Architecture
 
-This document covers two things: the architecture Folium **has today** (v1), and the architecture it
-is **being rebuilt into** (v2). The full v2 design lives in
+This document covers two things: the architecture Folium **has today** (v2), and the interview build
+it replaced (v1), kept because the reasoning for several decisions only makes sense against what came
+before. The full v2 design lives in
 [the foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md); this is
 the summary and the reasoning.
 
@@ -9,7 +10,8 @@ the summary and the reasoning.
 
 # Part 1 — v2: the production architecture
 
-**Status: designed and approved, not yet implemented.**
+**Status: implemented through Phase 2C. Real-time collaboration and version history are Phase 3 and
+are marked as such below.**
 
 ## Summary
 
@@ -164,7 +166,9 @@ specifically around real-time collaboration. Two consequences are accepted:
 
 # Part 2 — v1: the interview build
 
-This is what the code in the repository does today.
+**History.** None of this code is in the repository any more — Phase 2C-iii deleted it. It is kept
+here because the v2 decisions above were made against these constraints, and "why not just keep
+SQLite" is a fair question that deserves the original answer rather than a summary of it.
 
 ## Summary
 

@@ -3,18 +3,14 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: rebuilding for production — through Phase 2C-ii.**
-> Folium began as a timeboxed interview assignment and is now being rebuilt as a real product.
+> **Status: the rebuild is complete through Phase 2C. There is no v1 code left.**
+> Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
+> frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
+> stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, and file
+> import.
 >
-> **Working on the v2 stack today:** a separated `frontend/` (Next.js) and `backend/` (FastAPI) on
-> PostgreSQL with SQLAlchemy + Alembic and CI; real sign-up and sign-in through Supabase Auth, with
-> the backend verifying every JWT against Supabase's published keys; a server-rendered dashboard and
-> trash view where you can create a document, delete it with a confirmation, and restore it; and a
-> TipTap editor that opens a document, renames it, and autosaves it as JSON.
->
-> **Not yet rebuilt:** sharing and file import. Both still exist only in the v1 code, which is
-> compiled but firewalled off behind a 404 because its login route minted sessions with no password.
-> They return in Phase 2C-iii, which also deletes that code.
+> **Still to come:** live collaboration with multiple cursors, and version history with restore.
+> Editing today is last-write-wins — two people in one document overwrite each other.
 
 ---
 
@@ -27,38 +23,36 @@ share them with other people.
 | [2B](docs/superpowers/plans/2026-07-28-phase-2b-frontend-auth.md) | Design system, sign-up / sign-in / password reset, route guard, `/account` | Done |
 | [2C-i](docs/superpowers/plans/2026-07-28-phase-2c-i-dashboard.md) | Dashboard and trash on FastAPI: create, delete, restore | Done |
 | [2C-ii](docs/superpowers/plans/2026-07-30-phase-2c-ii-editor.md) | The editor: open a document, edit it, rename it, autosave as TipTap JSON | Done |
-| 2C-iii | Sharing with permission levels, file import, and deleting all v1 code | Next |
+| [2C-iii](docs/superpowers/plans/2026-07-30-phase-2c-iii-sharing-import.md) | Sharing with permission levels, file import, and deleting all v1 code | Done |
+| 3 | Live collaboration, and version history with restore | Next |
 
-Real-time collaboration and version history come after 2C. See the
-[foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for the full
-v2 design.
+See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
+the full v2 design.
 
-## v1 versus v2
+## What the rebuild changed
 
-| | v1 (retired, still compiled) | v2 (being built) |
+v1 was a single Next.js app with mocked auth and a local SQLite file. None of it remains.
+
+| | v1 | Today |
 |---|---|---|
 | Architecture | One Next.js app, frontend + API together | Separate Next.js frontend and FastAPI backend |
-| Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth ✅ |
-| Database | Local SQLite file | PostgreSQL on Supabase ✅ |
-| Content storage | HTML string | TipTap JSON ✅ |
+| Auth | Mocked — 3 seeded accounts, no passwords | Real sign-up via Supabase Auth |
+| Database | Local SQLite file | PostgreSQL on Supabase |
+| Content storage | HTML string | TipTap JSON |
 | Sharing | Binary — has access or doesn't | View / comment / edit permissions |
-| Collaboration | Autosave, refresh to see others' edits | Live multi-cursor editing |
-| Deletion | Permanent | Soft delete with a trash folder ✅ |
-| History | None | Version snapshots with restore |
-
-✅ marks what is built and working today.
+| Deletion | Permanent | Soft delete with a trash folder |
+| Collaboration | Autosave, refresh to see others' edits | Autosave — live editing is Phase 3 |
+| History | None | Version snapshots with restore — Phase 3 |
 
 ## What it does
 
-The product, with what the rebuild has reached so far:
-
 - Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
-  bulleted/numbered lists — with autosave. *Live.*
-- Import a `.txt` or `.md` file as a new document. *Returns in 2C-iii.*
-- Share a document with another user; the dashboard separates documents you own from documents
-  shared with you. *The split dashboard is live; the sharing UI returns in 2C-iii.*
-- Delete a document and restore it from the trash. *Live.*
-- Everything persists and survives a refresh or a server restart. *Live.*
+  bulleted/numbered lists — with autosave.
+- Import a `.txt` or `.md` file as a new document.
+- Share a document by email with view or edit access, change someone's level, or revoke it. The
+  dashboard separates documents you own from documents shared with you.
+- Delete a document and restore it from the trash.
+- Everything persists and survives a refresh or a server restart.
 
 ## The v2 stack
 
@@ -74,8 +68,8 @@ The product, with what the rebuild has reached so far:
 | Real-time | Managed collaboration service |
 | Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
-Everything above is in place except real-time collaboration, which comes after 2C. Editing today is
-last-write-wins: two people in one document overwrite each other, exactly as in v1.
+Everything above is in place except real-time collaboration, which is Phase 3. Editing today is
+last-write-wins: two people in one document overwrite each other.
 
 Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
 
@@ -102,28 +96,27 @@ cd frontend && npm run build
 cd frontend && npm run start
 ```
 
-### v1 is still in the tree
-
-`frontend/src/app/api/**`, plus the unreferenced v1 components (`DocumentEditorShell`, `Editor`,
-`ShareModal`, `TopBar`), are v1 code kept compiling until Phase 2C-iii deletes them. Middleware
-returns 404 for `/api/` — v1's login route minted a session for a seeded account with no password, so
-leaving it reachable would hand anyone the old data layer. The three seeded accounts (`alice@`,
-`bob@`, `carol@example.com`) are no longer usable, and the v1 SQLite file at `data/app.sqlite` is no
-longer read by anything you can reach.
-
-Its test suite still runs, and still guards the file-import conversion the rebuild will reuse:
+Frontend tests:
 
 ```bash
 cd frontend && npm test
 ```
 
-Node's built-in test runner against `test/*.test.ts` — document access control (owner / shared /
-denied), request validation schemas, and file-import conversion.
+Vitest, over the components, hooks, and API clients. `npm run e2e` runs Playwright — see
+[End-to-end tests](#end-to-end-tests).
 
-## File upload (v1 — returns in 2C-iii)
+### Left over from v1
 
-Supported types: **`.txt` and `.md`/`.markdown` only**, max 2MB — enforced both in the UI and on the
-server.
+Nothing in the codebase. If you ran v1 before, delete its database file — nothing reads it any more:
+
+```bash
+rm -rf data/
+```
+
+## File import
+
+Supported types: **`.txt` and `.md`/`.markdown` only**, max 2MB — checked in the browser for a fast
+rejection and enforced by the backend, which does the conversion.
 
 - `.txt` files split into paragraphs on blank lines.
 - `.md` files pass through a small dependency-free converter handling `#`/`##`/`###` headings,
@@ -136,13 +129,11 @@ server.
 frontend/               Next.js application
   src/app/(auth)/          sign-in, sign-up, password reset, OAuth callback
   src/app/(app)/           dashboard, trash, editor, account — behind the route guard
-  src/app/api/             v1 API routes, retired and 404'd until 2C-iii
   src/components/          React components (ui/ is shadcn, on React 18 refs)
-  src/lib/                 API clients, Supabase clients, validation, file import
+  src/lib/                 API clients, Supabase clients, hooks, validation
   src/middleware.ts        route guard — must live in src/, not the project root
-  test/                    v1 test suite (node --test)
   e2e/                     Playwright specs
-backend/                FastAPI application (v2)
+backend/                FastAPI application
   app/api/                 route handlers
   app/core/                exceptions, constants
   app/db/                  session, base
@@ -162,16 +153,15 @@ ARCHITECTURE.md         architecture, v1 and v2
 DEPLOY.md               deployment guide
 ```
 
-## Known limitations of v1
+## Known limitations
 
-These are the reasons v2 exists:
-
-- **Auth is mocked** — no passwords, no sign-up.
-- **Sharing is binary** — no view-only vs. edit levels.
-- **Markdown import is minimal** — headings, bold, italic, lists only.
-- **No real-time collaboration** — autosave only; simultaneous editors silently overwrite each other.
-- **No version history, no trash, no undo-delete.**
-- **Local SQLite file** — requires a persistent disk, so it cannot scale horizontally.
+- **No real-time collaboration.** Autosave only; two people editing one document overwrite each
+  other. Phase 3.
+- **No version history**, so no undoing yesterday's edit. Phase 3.
+- **Markdown import is minimal** — headings, bold, italic, and lists only.
+- **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
+  that has not signed up fails rather than waiting for them.
+- **No comments**, though the permission model already carries a `comment` level for them.
 
 ## Development
 

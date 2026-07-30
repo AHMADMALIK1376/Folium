@@ -4,6 +4,7 @@ import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { CreateDocumentButton } from "@/components/documents/CreateDocumentButton";
 import { DeleteDocumentDialog } from "@/components/documents/DeleteDocumentDialog";
 import { DocumentList } from "@/components/documents/DocumentList";
+import { ImportDocumentButton } from "@/components/documents/ImportDocumentButton";
 import { getDocuments } from "@/lib/api/server";
 import type { DocumentListResponse } from "@/lib/api/types";
 
@@ -25,6 +26,7 @@ export default async function DashboardPage() {
           <Link href="/trash" className="text-sm text-neutral-500 hover:text-carmine-500">
             Trash
           </Link>
+          <ImportDocumentButton />
           <CreateDocumentButton />
         </div>
       </div>
@@ -37,8 +39,14 @@ export default async function DashboardPage() {
       />
 
       {/* No delete action on shared documents: only an owner may delete, which
-          the backend enforces, so the button would only ever produce a 404. */}
-      <DocumentList title="Shared with you" documents={data.shared} />
+          the backend enforces, so the button would only ever produce a 404.
+          The empty message is deliberate — an unexplained blank section gave a
+          new user no hint that sharing exists at all. */}
+      <DocumentList
+        title="Shared with you"
+        documents={data.shared}
+        emptyMessage="Documents other people share with you appear here."
+      />
     </>
   );
 }

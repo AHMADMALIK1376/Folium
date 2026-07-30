@@ -30,3 +30,13 @@ class ValidationError(FoliumError):
 
 class ConflictError(FoliumError):
     """The request conflicts with current state."""
+
+
+class JwksUnavailableError(FoliumError):
+    """Supabase's signing keys could not be fetched and nothing is cached.
+
+    This is an infrastructure failure, not an authentication decision, so it
+    maps to 503. It must NEVER be downgraded into allowing the request: doing
+    so would let an attacker bypass authentication by making the key endpoint
+    unreachable.
+    """

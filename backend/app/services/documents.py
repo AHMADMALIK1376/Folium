@@ -61,6 +61,20 @@ async def list_documents(
     return list(owned_result.scalars()), list(shared_result.scalars())
 
 
+async def list_trash(db: AsyncSession, user_id: UUID) -> list[Document]:
+    """Soft-deleted documents the user owns, most recently deleted first.
+
+    Owner-only by construction: a collaborator cannot restore a document, and
+    showing it in their trash would imply a claim they do not have.
+    """
+    result = await db.execute(
+        select(Document)
+        .where(Document.owner_id == user_id, Document.is_deleted.is_(True))
+        .order_by(Document.deleted_at.desc())
+    )
+    return list(result.scalars())
+
+
 async def create_document(db: AsyncSession, user_id: UUID, data: DocumentCreate) -> Document:
     content = data.content if data.content is not None else empty_doc()
     document = Document(

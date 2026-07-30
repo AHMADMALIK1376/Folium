@@ -1,9 +1,11 @@
 # Deployment Guide
 
-This covers deployment for both versions. **Phase 1 of v2 is implemented** — the separated
-`frontend/` and `backend/` applications, PostgreSQL, and CI all exist and run. The Supabase Auth and
-managed-collaboration pieces described in Part 1 arrive in later phases, so treat those steps as the
-target setup rather than something you can complete today.
+This covers deployment for both versions. **Phase 2A of v2 is implemented** — the separated
+`frontend/` and `backend/` applications, PostgreSQL, CI, and backend-side Supabase Auth all exist and
+run. The backend verifies real Supabase JWTs, and `SUPABASE_URL` is a mandatory environment variable
+today, not a future one. The frontend is not yet wired up to Supabase Auth, so end-user sign-in through
+the browser still arrives with the frontend phases; until then, treat the frontend-facing steps in
+Part 1 as the target setup rather than something you can complete today.
 
 ---
 
@@ -34,7 +36,8 @@ Set up Supabase first — both other services need its credentials.
 2. From **Project Settings → API**, record:
    - Project URL
    - `anon` public key — safe for the browser
-   - `service_role` key — **server-side only, never expose this to the frontend**
+   - `service_role` key — **not needed by Folium's backend; do not copy it anywhere, and never expose
+     it to the frontend**
 3. From **Project Settings → Database**, record the connection string for Alembic and SQLAlchemy.
 4. Under **Authentication → Providers**, enable email/password and any OAuth providers you want.
 5. Under **Authentication → URL Configuration**, add your frontend URLs (local and production) as
@@ -53,10 +56,13 @@ Set up Supabase first — both other services need its credentials.
    ```
    DATABASE_URL=<Supabase connection string>
    SUPABASE_URL=<project URL>
-   SUPABASE_SERVICE_ROLE_KEY=<service_role key>
-   SUPABASE_JWT_ISSUER=<project URL>/auth/v1
    FRONTEND_ORIGIN=<your Vercel URL>
+   ENVIRONMENT=production
    ```
+
+   `SUPABASE_SERVICE_ROLE_KEY` is deliberately absent. The backend only verifies tokens against
+   Supabase's public keys and never calls the admin API, so it has no need for a credential that could
+   mint tokens or bypass access control. Do not add it.
 
 5. Run migrations once the service is up: `alembic upgrade head`.
 

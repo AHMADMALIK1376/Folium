@@ -28,8 +28,16 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      # `npm test` is the Vitest suite. Until Phase 2C-iii it was the v1
+      # `node --test` suite, and Vitest was `npm run test:unit`, which CI never
+      # ran — so every frontend test written in 2B and 2C was invisible here.
+      # If a second suite is ever added, add a step; do not repoint this one.
       - name: Test
         run: npm test
+
+      # Playwright deliberately stays out of CI: it needs Supabase credentials,
+      # which would mean a database password in GitHub secrets and every run
+      # creating real accounts. It runs locally, against a real project.
 
       - name: Build
         run: npm run build

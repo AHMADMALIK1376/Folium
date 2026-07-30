@@ -156,3 +156,65 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+/* Editor content.
+   The project has no typography plugin, and adding one for six elements would
+   be a dependency for nothing: TipTap emits plain h1/h2/p/ul/ol/li/strong/em,
+   and StarterKit is configured to produce nothing else. Scoped to
+   .folium-prose so it can never restyle the app around the editor. */
+.folium-prose {
+  color: var(--color-neutral-900);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.folium-prose > * + * {
+  margin-top: 0.75em;
+}
+
+.folium-prose h1 {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 1.5em;
+}
+
+.folium-prose h2 {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.4em;
+}
+
+.folium-prose h1:first-child,
+.folium-prose h2:first-child {
+  margin-top: 0;
+}
+
+.folium-prose ul,
+.folium-prose ol {
+  padding-left: 1.5rem;
+}
+
+.folium-prose ul {
+  list-style: disc;
+}
+
+.folium-prose ol {
+  list-style: decimal;
+}
+
+.folium-prose li > * + * {
+  margin-top: 0.35em;
+}
+
+.folium-prose strong {
+  font-weight: 600;
+}
+
+/* The focus ring belongs on the editor's container, not on its text. */
+.folium-prose:focus,
+.folium-prose:focus-visible {
+  outline: none;
+}

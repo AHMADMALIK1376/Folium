@@ -51,6 +51,13 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
     editorProps: {
       attributes: {
         class: "folium-prose min-h-[60vh] px-6 py-5 outline-none",
+        // ProseMirror sets only contenteditable, which confers no role of its
+        // own — assistive technology and role-based test queries alike see a
+        // plain div. Declaring textbox + aria-multiline is the documented
+        // pattern for a rich-text region, and makes the editor addressable by
+        // what it is rather than by a CSS class.
+        role: "textbox",
+        "aria-multiline": "true",
         "aria-label": "Document body",
       },
     },

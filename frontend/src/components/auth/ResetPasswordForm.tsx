@@ -10,6 +10,7 @@ import { AuthMessage } from "@/components/auth/AuthMessage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DEFAULT_REDIRECT } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
 import {
   newPasswordSchema,
@@ -138,7 +139,7 @@ export function ResetPasswordForm() {
       return;
     }
 
-    router.push("/account");
+    router.push(DEFAULT_REDIRECT);
     router.refresh();
   };
 

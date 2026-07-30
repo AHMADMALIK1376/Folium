@@ -8,6 +8,13 @@ describe("safeRedirect", () => {
     expect(safeRedirect("/documents/abc")).toBe("/documents/abc");
   });
 
+  it("defaults to the dashboard", () => {
+    // Pinned deliberately: where a signed-in user lands is a product decision,
+    // not an arbitrary default, so changing it should break a test.
+    expect(DEFAULT_REDIRECT).toBe("/dashboard");
+    expect(safeRedirect(null)).toBe("/dashboard");
+  });
+
   it("falls back to the default for missing input", () => {
     expect(safeRedirect(null)).toBe(DEFAULT_REDIRECT);
     expect(safeRedirect(undefined)).toBe(DEFAULT_REDIRECT);

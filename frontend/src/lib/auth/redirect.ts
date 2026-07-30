@@ -5,7 +5,7 @@
  * otherwise let `?redirectTo=https://evil.example.com` bounce a
  * freshly-authenticated user to an attacker's site.
  */
-export const DEFAULT_REDIRECT = "/account";
+export const DEFAULT_REDIRECT = "/dashboard";
 
 export function safeRedirect(target: string | null | undefined): string {
   if (!target) return DEFAULT_REDIRECT;

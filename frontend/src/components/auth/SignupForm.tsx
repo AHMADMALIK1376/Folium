@@ -11,6 +11,7 @@ import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DEFAULT_REDIRECT } from "@/lib/auth/redirect";
 import { createClient } from "@/lib/supabase/client";
 import { signupSchema, type SignupValues } from "@/lib/validation/auth";
 
@@ -64,7 +65,7 @@ export function SignupForm() {
       // straight into the app instead of telling them to check an inbox
       // that will stay empty.
       if (data?.session) {
-        router.push("/account");
+        router.push(DEFAULT_REDIRECT);
         router.refresh();
         return;
       }

@@ -73,7 +73,7 @@ describe("SignupForm", () => {
     expect(message.textContent).not.toMatch(/already|exists|taken/i);
   });
 
-  it("sends a newly signed-in user straight to their account", async () => {
+  it("sends a newly signed-in user straight into the app", async () => {
     // With confirmations off, signUp returns a live session immediately —
     // there is no confirmation email coming, so the user should land in the
     // app instead of being told to check an inbox that stays empty.
@@ -87,7 +87,7 @@ describe("SignupForm", () => {
     await userEvent.type(screen.getByLabelText(/password/i), "secret123");
     await userEvent.click(screen.getByRole("button", { name: /create account/i }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/account"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
     expect(screen.queryByText(/check your inbox/i)).not.toBeInTheDocument();
   });
 });

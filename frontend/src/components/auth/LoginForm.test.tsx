@@ -62,7 +62,7 @@ describe("LoginForm", () => {
     await userEvent.type(screen.getByLabelText(/password/i), "secret123");
     await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/account"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
   });
 
   it("explains a rate limit rather than blaming the credentials", async () => {
@@ -95,7 +95,7 @@ describe("LoginForm", () => {
     await userEvent.type(screen.getByLabelText(/password/i), "secret123");
     await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/account"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/dashboard"));
     expect(push).not.toHaveBeenCalledWith("https://evil.example.com");
   });
 

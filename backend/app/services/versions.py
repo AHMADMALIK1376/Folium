@@ -4,7 +4,10 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Document, DocumentVersion
+from app.core.exceptions import NotFoundError
+from app.models import Document, DocumentVersion, User
+from app.services.permissions import can_edit
+from app.utils.import_file import doc_to_plain_text
 
 # How long to wait before one document earns another snapshot.
 #
@@ -108,3 +111,94 @@ async def prune(db: AsyncSession, document_id: UUID) -> None:
             DocumentVersion.id.not_in(keep),
         )
     )
+
+
+async def list_versions(
+    db: AsyncSession, document_id: UUID, user_id: UUID
+) -> list[tuple[DocumentVersion, str | None]]:
+    """A document's history, newest first, with each author's display name.
+
+    Access follows *view* permission, enforced by get_document — someone who can
+    open the document can already read its current content, and its history is
+    the same document over time. get_document also raises NotFoundError for a
+    document the caller may not see, so this cannot be used to discover one.
+    """
+    from app.services.documents import get_document
+
+    await get_document(db, document_id, user_id)
+
+    result = await db.execute(
+        select(DocumentVersion, User.display_name)
+        .outerjoin(User, User.id == DocumentVersion.created_by)
+        .where(DocumentVersion.document_id == document_id)
+        .order_by(DocumentVersion.created_at.desc())
+    )
+    return [(row[0], row[1]) for row in result]
+
+
+async def get_version(
+    db: AsyncSession, document_id: UUID, version_id: UUID, user_id: UUID
+) -> tuple[DocumentVersion, str | None]:
+    """One version, with its content.
+
+    Filters on the document id as well as the version id, and that is
+    load-bearing rather than tidy: matching on the version alone would make
+    `/documents/A/versions/{id-from-B}` a way to read B's content through A's
+    permissions.
+    """
+    from app.services.documents import get_document
+
+    await get_document(db, document_id, user_id)
+
+    result = await db.execute(
+        select(DocumentVersion, User.display_name)
+        .outerjoin(User, User.id == DocumentVersion.created_by)
+        .where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+        )
+    )
+    row = result.first()
+    if row is None:
+        raise NotFoundError("Version not found")
+    return row[0], row[1]
+
+
+async def restore_version(
+    db: AsyncSession, document_id: UUID, version_id: UUID, user_id: UUID
+) -> Document:
+    """Put a document back to an earlier state.
+
+    Requires edit permission, not ownership: an editor can already replace the
+    whole body by selecting all and typing, so restricting this would protect
+    nothing while removing the one safe way to undo that.
+
+    The current content is snapshotted first, unconditionally and ignoring the
+    interval — restoring the wrong draft has to be undoable, and a restore is
+    deliberate enough to be worth a row.
+    """
+    from app.services.documents import get_document
+
+    document, permission = await get_document(db, document_id, user_id)
+    if not can_edit(permission):
+        raise NotFoundError("Document not found")
+
+    result = await db.execute(
+        select(DocumentVersion).where(
+            DocumentVersion.id == version_id,
+            DocumentVersion.document_id == document_id,
+        )
+    )
+    version = result.scalar_one_or_none()
+    if version is None:
+        raise NotFoundError("Version not found")
+
+    await snapshot(db, document, user_id)
+
+    document.content = version.content
+    document.content_text = doc_to_plain_text(version.content)
+
+    await prune(db, document_id)
+    await db.commit()
+    await db.refresh(document)
+    return document

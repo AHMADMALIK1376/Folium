@@ -34,9 +34,22 @@ class Settings(BaseSettings):
 
     jwks_cache_ttl_seconds: int = 600
 
+    # Connection string for a y-sweet server, e.g.
+    # ys://<token>@localhost:8080 locally, or the Jamsocket-issued value.
+    #
+    # Blank by default, and blank means collaboration is simply off: the editor
+    # falls back to the single-user autosave it has had since Phase 2C-ii. A
+    # deployment that has not configured this is not broken, and CI needs no
+    # vendor to run the suite.
+    y_sweet_connection_string: str = ""
+
     @property
     def is_development(self) -> bool:
         return self.environment == "development"
+
+    @property
+    def collaboration_enabled(self) -> bool:
+        return bool(self.y_sweet_connection_string.strip())
 
     @property
     def cors_origins(self) -> list[str]:

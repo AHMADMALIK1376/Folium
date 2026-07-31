@@ -1,0 +1,19 @@
+from pydantic import BaseModel
+
+
+class CollabSession(BaseModel):
+    """What a client needs to join a document's collaboration room.
+
+    `enabled` is false when the deployment has no y-sweet configured. That is a
+    supported state, not an error: the editor falls back to the single-user
+    autosave it has had since Phase 2C-ii, and the rest of the fields are null.
+    """
+
+    enabled: bool
+    url: str | None = None
+    doc_id: str | None = None
+    token: str | None = None
+    # What the caller may do, so a viewer's client knows to stay out of the
+    # shared document. Advisory only — content reaches the database through
+    # PATCH, which enforces this properly.
+    permission: str

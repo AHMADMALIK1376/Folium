@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
 import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
@@ -148,6 +149,22 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
         )}
 
         {editable && <SaveStatus status={status} />}
+
+        <HistoryDialog
+          documentId={document.id}
+          canEdit={editable}
+          onRestored={(content) => {
+            // The one place the editor takes content after mount.
+            //
+            // 2C-ii seeds `content` once and never re-seeds from props, because
+            // a re-render would move the caret out from under whoever is typing.
+            // A restore is the legitimate exception: the content genuinely
+            // changed, at this user's explicit request. Applied as a command
+            // rather than through props, so it happens exactly once and cannot
+            // re-fire on an unrelated re-render.
+            editor?.commands.setContent(content as JSONContent);
+          }}
+        />
 
         {/* Owners only, not editors: the backend answers 404 to share mutations
             from anyone but the owner, so an editor given this could only ever

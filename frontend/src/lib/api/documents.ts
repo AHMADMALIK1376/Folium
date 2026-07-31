@@ -1,5 +1,6 @@
 import { apiFetch } from "./client";
 import type {
+  CollabSession,
   DocumentDetail,
   GrantablePermission,
   Share,
@@ -122,4 +123,16 @@ export function restoreVersion(
     `/api/v1/documents/${id}/versions/${versionId}/restore`,
     { method: "POST" },
   );
+}
+
+/** Authorise this browser for a document's collaboration room.
+ *
+ * POST rather than GET because it creates the room on first use. A 404 means
+ * the document is not visible to this user; a 503 means the collaboration
+ * server is down, which the caller should treat as "edit alone", not as an
+ * error worth showing. */
+export function getCollabSession(id: string): Promise<CollabSession> {
+  return apiFetch<CollabSession>(`/api/v1/documents/${id}/collab`, {
+    method: "POST",
+  });
 }

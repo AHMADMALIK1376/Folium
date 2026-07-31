@@ -74,3 +74,17 @@ export interface DocumentDetail extends DocumentSummary {
   permission: Permission;
   owner: UserProfile;
 }
+
+/** What a client needs to join a document's collaboration room.
+ *
+ * `enabled` is false when the deployment has no y-sweet configured — a
+ * supported state, not a failure. The editor then behaves exactly as it did
+ * before Phase 4: local editing with autosave. */
+export interface CollabSession {
+  enabled: boolean;
+  url: string | null;
+  base_url: string | null;
+  doc_id: string | null;
+  token: string | null;
+  permission: Permission;
+}

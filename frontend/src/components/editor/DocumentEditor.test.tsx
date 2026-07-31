@@ -17,9 +17,24 @@ vi.mock("@/lib/api/documents", () => ({
  *  ProseMirror would prove nothing about editing anyway — Playwright covers the
  *  real editor in a real browser. What is worth testing here is everything
  *  around it: permissions, the title, and how a failed save reads. */
+const collabState = {
+  enabled: false,
+  provider: null as unknown,
+  doc: null as unknown,
+  loading: false,
+  canWrite: false,
+};
+vi.mock("@/lib/collab/useCollaboration", () => ({
+  useCollaboration: () => collabState,
+}));
+
+/** The options the editor was built with, so the extension list and the content
+ *  seeding can be asserted without a real ProseMirror. */
+let editorOptions: Record<string, unknown> = {};
+
 const setEditable = vi.fn();
 vi.mock("@tiptap/react", () => ({
-  useEditor: (options: { editable: boolean }) => ({
+  useEditor: (options: { editable: boolean }) => ((editorOptions = options), {
     isActive: () => false,
     setEditable,
     getJSON: () => ({ type: "doc", content: [] }),
@@ -35,6 +50,10 @@ vi.mock("@tiptap/react", () => ({
       }),
     }),
     isEditable: options.editable,
+    isEmpty: true,
+    commands: { setContent: vi.fn() },
+    on: vi.fn(),
+    off: vi.fn(),
   }),
   EditorContent: () => <div data-testid="editor-content" />,
 }));
@@ -165,5 +184,94 @@ describe("DocumentEditor", () => {
     render(<DocumentEditor document={makeDocument("owner")} />);
 
     expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+  });
+});
+
+/** Names of the extensions the editor was configured with. */
+function extensionNames() {
+  return ((editorOptions.extensions as { name?: string }[]) ?? []).map(
+    (extension) => extension?.name,
+  );
+}
+
+describe("DocumentEditor with collaboration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editorOptions = {};
+    Object.assign(collabState, {
+      enabled: false,
+      provider: null,
+      doc: null,
+      loading: false,
+      canWrite: false,
+    });
+  });
+
+  it("edits alone when no collaboration server is configured", () => {
+    render(<DocumentEditor document={makeDocument("owner")} />);
+
+    expect(extensionNames()).not.toContain("collaboration");
+    // Seeded from props, because there is no shared document to seed from.
+    expect(editorOptions.content).toBeTruthy();
+  });
+
+  it("does not seed from props when the room owns the content", () => {
+    // Seeding here as well as from the room inserts the document twice, which
+    // is the failure this whole mechanic exists to avoid.
+    Object.assign(collabState, {
+      enabled: true,
+      doc: {},
+      provider: { on: vi.fn(), off: vi.fn() },
+      canWrite: true,
+    });
+
+    render(<DocumentEditor document={makeDocument("owner")} />);
+
+    expect(editorOptions.content).toBeUndefined();
+  });
+
+  it("adds collaboration and cursors when connected", () => {
+    Object.assign(collabState, {
+      enabled: true,
+      doc: {},
+      provider: { on: vi.fn(), off: vi.fn() },
+      canWrite: true,
+    });
+
+    render(<DocumentEditor document={makeDocument("owner")} />);
+
+    const names = extensionNames();
+    expect(names).toContain("collaboration");
+    expect(names).toContain("collaborationCursor");
+  });
+
+  it("waits for the provider to sync before seeding an empty room", () => {
+    // Before sync every client's document looks empty, so seeding on mount
+    // would insert the text once per connected client.
+    const on = vi.fn();
+    Object.assign(collabState, {
+      enabled: true,
+      doc: {},
+      provider: { on, off: vi.fn() },
+      canWrite: true,
+    });
+
+    render(<DocumentEditor document={makeDocument("owner")} />);
+
+    expect(on).toHaveBeenCalledWith("synced", expect.any(Function));
+  });
+
+  it("never seeds on behalf of a read-only user", () => {
+    const on = vi.fn();
+    Object.assign(collabState, {
+      enabled: true,
+      doc: {},
+      provider: { on, off: vi.fn() },
+      canWrite: false,
+    });
+
+    render(<DocumentEditor document={makeDocument("view")} />);
+
+    expect(on).not.toHaveBeenCalled();
   });
 });

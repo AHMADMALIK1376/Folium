@@ -13,6 +13,9 @@ const {
   updateShare,
   deleteShare,
   importDocument,
+  listVersions,
+  getVersion,
+  restoreVersion,
 } = await import("./documents");
 
 const content: TipTapDoc = {
@@ -111,6 +114,39 @@ describe("share fetchers", () => {
     const [path, init] = apiFetch.mock.calls[0];
     expect(path).toBe("/api/v1/documents/doc-1/shares/u2");
     expect(init.method).toBe("DELETE");
+  });
+});
+
+describe("version history fetchers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists a document's versions", async () => {
+    apiFetch.mockResolvedValue([]);
+
+    await listVersions("doc-1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/documents/doc-1/versions");
+  });
+
+  it("reads one version, which is the only way to get its content", async () => {
+    apiFetch.mockResolvedValue({ id: "v1", content });
+
+    await getVersion("doc-1", "v1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/documents/doc-1/versions/v1");
+  });
+
+  it("restores a version and returns the updated document", async () => {
+    apiFetch.mockResolvedValue({ id: "doc-1", content });
+
+    const restored = await restoreVersion("doc-1", "v1");
+
+    const [path, init] = apiFetch.mock.calls[0];
+    expect(path).toBe("/api/v1/documents/doc-1/versions/v1/restore");
+    expect(init.method).toBe("POST");
+    // The updated document comes back, so the editor can take the new content
+    // without a second request.
+    expect(restored).toMatchObject({ content });
   });
 });
 

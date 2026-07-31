@@ -3,14 +3,14 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: the rebuild is complete through Phase 2C. There is no v1 code left.**
+> **Status: the rebuild is complete through Phase 3. There is no v1 code left.**
 > Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
 > frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
-> stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, and file
-> import.
+> stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
+> import, and version history with restore.
 >
-> **Still to come:** live collaboration with multiple cursors, and version history with restore.
-> Editing today is last-write-wins — two people in one document overwrite each other.
+> **Still to come:** live collaboration with multiple cursors. Editing today is last-write-wins —
+> two people in one document overwrite each other, which is what version history exists to rescue.
 
 ---
 
@@ -24,7 +24,8 @@ share them with other people.
 | [2C-i](docs/superpowers/plans/2026-07-28-phase-2c-i-dashboard.md) | Dashboard and trash on FastAPI: create, delete, restore | Done |
 | [2C-ii](docs/superpowers/plans/2026-07-30-phase-2c-ii-editor.md) | The editor: open a document, edit it, rename it, autosave as TipTap JSON | Done |
 | [2C-iii](docs/superpowers/plans/2026-07-30-phase-2c-iii-sharing-import.md) | Sharing with permission levels, file import, and deleting all v1 code | Done |
-| 3 | Live collaboration, and version history with restore | Next |
+| [3](docs/superpowers/plans/2026-08-01-phase-3-version-history.md) | Version history: snapshots as you edit, preview, and restore | Done |
+| 4 | Live collaboration with multiple cursors | Next |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -41,8 +42,8 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 | Content storage | HTML string | TipTap JSON |
 | Sharing | Binary — has access or doesn't | View / comment / edit permissions |
 | Deletion | Permanent | Soft delete with a trash folder |
-| Collaboration | Autosave, refresh to see others' edits | Autosave — live editing is Phase 3 |
-| History | None | Version snapshots with restore — Phase 3 |
+| Collaboration | Autosave, refresh to see others' edits | Autosave — live editing is Phase 4 |
+| History | None | Version snapshots with restore |
 
 ## What it does
 
@@ -51,6 +52,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Import a `.txt` or `.md` file as a new document.
 - Share a document by email with view or edit access, change someone's level, or revoke it. The
   dashboard separates documents you own from documents shared with you.
+- Browse a document's version history, preview an earlier draft, and restore it.
 - Delete a document and restore it from the trash.
 - Everything persists and survives a refresh or a server restart.
 
@@ -68,7 +70,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 | Real-time | Managed collaboration service |
 | Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
-Everything above is in place except real-time collaboration, which is Phase 3. Editing today is
+Everything above is in place except real-time collaboration, which is Phase 4. Editing today is
 last-write-wins: two people in one document overwrite each other.
 
 Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
@@ -123,6 +125,26 @@ rejection and enforced by the backend, which does the conversion.
   `**bold**`, `*italic*`, and `-`/numbered lists. It is **not** a full CommonMark parser — no tables,
   code blocks, links, or nested lists.
 
+## Version history
+
+Every document keeps earlier drafts, saved as you edit. Open one and click **History** to preview a
+version and restore it; restoring is itself recorded, so restoring the wrong draft is undoable.
+
+Snapshots are deliberately not taken on every save — autosave fires roughly every 800ms, and doing so
+would put hundreds of full-document copies per session into a free-tier database. A version is written
+when:
+
+- the document has no history yet, **or**
+- the newest version is more than five minutes old, **or**
+- someone other than the last author is editing.
+
+That last rule is the one that matters most: two collaborators overwriting each other is exactly what
+history exists to rescue, and time alone would let one silently replace the other inside a single
+window.
+
+Each document keeps its newest 50 versions. Changing only the title records nothing. Anyone who can
+view a document can read its history; only someone who can edit it can restore.
+
 ## Repository layout
 
 ```
@@ -156,8 +178,10 @@ DEPLOY.md               deployment guide
 ## Known limitations
 
 - **No real-time collaboration.** Autosave only; two people editing one document overwrite each
-  other. Phase 3.
-- **No version history**, so no undoing yesterday's edit. Phase 3.
+  other — recoverable from version history, but not prevented. Phase 4.
+- **Version history is automatic, not manual.** A snapshot is kept at most every five minutes per
+  author, and only the newest 50 per document, so the very last keystrokes before a mistake may not
+  have their own version.
 - **Markdown import is minimal** — headings, bold, italic, and lists only.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
   that has not signed up fails rather than waiting for them.

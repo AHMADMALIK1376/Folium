@@ -14,6 +14,7 @@ from app.core.exceptions import (
     PermissionDeniedError,
     ValidationError,
 )
+from app.services.collab import CollabUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,20 @@ async def handle_jwks_unavailable(request: Request, exc: JwksUnavailableError) -
     return JSONResponse(
         status_code=503,
         content={"detail": "Authentication is temporarily unavailable"},
+    )
+
+
+@app.exception_handler(CollabUnavailableError)
+async def handle_collab_unavailable(
+    request: Request, exc: CollabUnavailableError
+) -> JSONResponse:
+    # 503, never 401 and never 500: the collaboration server being unreachable
+    # is an outage, and the editor degrades to single-user autosave rather than
+    # failing. Logged because, unlike a 404, nobody else will notice it.
+    logger.warning("collaboration server unavailable: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Collaboration is temporarily unavailable"},
     )
 
 

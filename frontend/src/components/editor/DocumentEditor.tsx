@@ -1,5 +1,7 @@
 "use client";
 
+import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -10,9 +12,12 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
 import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
+import { cursorColor } from "@/lib/collab/color";
+import { useCollaboration } from "@/lib/collab/useCollaboration";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 
 /** Read-only covers `comment` as well as `view`.
@@ -49,16 +54,42 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
   );
   const { status, error, schedule, flush } = useAutosave({ save });
 
+  const collab = useCollaboration(document.id);
+
   const editor = useEditor({
-    extensions: [StarterKit, Underline],
-    // Seeded once. Re-seeding from props on re-render would move the caret out
-    // from under the user: from mount onward the editor owns its own content.
+    extensions: [
+      // History is TipTap's own undo stack. With Collaboration it must be off:
+      // Collaboration brings a Yjs-aware undo manager, and running both means
+      // undo either skips your own edits or reverts someone else's.
+      collab.enabled ? StarterKit.configure({ history: false }) : StarterKit,
+      Underline,
+      ...(collab.enabled && collab.doc
+        ? [
+            Collaboration.configure({ document: collab.doc }),
+            CollaborationCursor.configure({
+              provider: collab.provider,
+              user: {
+                name: document.owner.display_name || "Someone",
+                color: cursorColor(document.owner_id),
+              },
+            }),
+          ]
+        : []),
+    ],
+    // Seeded once, and only when editing alone. Re-seeding from props on
+    // re-render would move the caret out from under the user: from mount onward
+    // the editor owns its own content.
+    //
+    // Under collaboration the Y.Doc is the source of truth, and seeding here as
+    // well would insert the document a second time — once from props and once
+    // from the room. The room is seeded separately, after sync, and only if it
+    // is genuinely empty.
     //
     // The cast is the one place the loose wire type meets TipTap's own. Our
     // TipTapDoc deliberately does not restate the node tree — the backend
     // validates every write against it — so nothing here can narrow it
     // truthfully; TipTap rejects malformed content at parse time regardless.
-    content: document.content as JSONContent,
+    content: collab.enabled ? undefined : (document.content as JSONContent),
     editable,
     // TipTap renders synchronously by default, producing server markup the
     // client cannot match. Required for any editor inside a Server Component
@@ -77,8 +108,18 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
         "aria-label": "Document body",
       },
     },
-    onUpdate: ({ editor }) => schedule({ content: editor.getJSON() as TipTapDoc }),
-  });
+    onUpdate: ({ editor, transaction }) => {
+      // Yjs applies remote edits as transactions here too. Without this filter
+      // every connected client would PATCH every keystroke everyone typed,
+      // multiplying writes by the number of people in the room and racing them
+      // against each other.
+      if (collab.enabled && transaction.getMeta("y-sync$")) return;
+      schedule({ content: editor.getJSON() as TipTapDoc });
+    },
+  },
+  // Rebuilt when collaboration arrives: the extension list and the content
+  // seeding both depend on it, and the token request resolves after mount.
+  [collab.enabled, collab.doc, collab.provider]);
 
   useEffect(() => {
     if (!editor) return;
@@ -87,6 +128,26 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
     // document the backend will refuse to save.
     editor.setEditable(editable);
   }, [editable, editor]);
+
+  useEffect(() => {
+    if (!collab.enabled || !collab.provider || !editor || !editable) return;
+
+    // Seed a room that has never held this document — but only after the
+    // provider says it has synced.
+    //
+    // This is the trap the whole feature turns on. Before sync, every client's
+    // Y.Doc is empty, so seeding on mount means each one inserts the document
+    // and the text appears two or three times. After sync, "empty" means
+    // genuinely empty: nobody has ever opened this document collaboratively,
+    // and the copy in Postgres is the one to start from.
+    const seedIfEmpty = (synced: boolean) => {
+      if (!synced || !editor.isEmpty) return;
+      editor.commands.setContent(document.content as JSONContent);
+    };
+
+    collab.provider.on("synced", seedIfEmpty);
+    return () => collab.provider?.off("synced", seedIfEmpty);
+  }, [collab.enabled, collab.provider, editor, editable, document.content]);
 
   useEffect(() => {
     if (!editable) return;
@@ -148,6 +209,22 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
         )}
 
         {editable && <SaveStatus status={status} />}
+
+        <HistoryDialog
+          documentId={document.id}
+          canEdit={editable}
+          onRestored={(content) => {
+            // The one place the editor takes content after mount.
+            //
+            // 2C-ii seeds `content` once and never re-seeds from props, because
+            // a re-render would move the caret out from under whoever is typing.
+            // A restore is the legitimate exception: the content genuinely
+            // changed, at this user's explicit request. Applied as a command
+            // rather than through props, so it happens exactly once and cannot
+            // re-fire on an unrelated re-render.
+            editor?.commands.setContent(content as JSONContent);
+          }}
+        />
 
         {/* Owners only, not editors: the backend answers 404 to share mutations
             from anyone but the owner, so an editor given this could only ever

@@ -54,8 +54,37 @@ export interface Share {
   created_at: string;
 }
 
+export interface VersionSummary {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  /** Null when the author's account was deleted — created_by is ON DELETE SET
+   *  NULL, so history outlives the account that wrote it. Render "Unknown". */
+  author_name: string | null;
+}
+
+/** One version with its content. The list deliberately omits content, so this
+ *  is the only way to see what a version actually holds. */
+export interface VersionDetail extends VersionSummary {
+  content: TipTapDoc;
+}
+
 export interface DocumentDetail extends DocumentSummary {
   content: TipTapDoc;
   permission: Permission;
   owner: UserProfile;
+}
+
+/** What a client needs to join a document's collaboration room.
+ *
+ * `enabled` is false when the deployment has no y-sweet configured — a
+ * supported state, not a failure. The editor then behaves exactly as it did
+ * before Phase 4: local editing with autosave. */
+export interface CollabSession {
+  enabled: boolean;
+  url: string | null;
+  base_url: string | null;
+  doc_id: string | null;
+  token: string | null;
+  permission: Permission;
 }

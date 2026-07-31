@@ -118,6 +118,16 @@ real-time editing.
 
 **A `document_versions` table** — snapshots on meaningful saves, enabling restore.
 
+"Meaningful" carries the weight here, and Phase 3 had to define it. Autosave fires roughly every
+800ms, so snapshotting each save would put hundreds of full-document JSONB copies per session into a
+database whose free tier holds 500MB of real users' documents. A version is written only when the
+document has no history, when the newest is over five minutes old, or when **a different author** is
+saving than last time — that third rule being the one the feature exists for, since two collaborators
+overwriting each other inside one window would otherwise keep nothing. Each write prunes that document
+to its newest 50, in the same transaction, so retention cannot drift from the insert that triggered
+it. The row holds the content being *replaced*, which is what makes restoring mean "go back" rather
+than "duplicate what is on screen".
+
 **Soft delete** via `is_deleted` and `deleted_at`. v1 deletes permanently, which for real users is a
 support nightmare.
 

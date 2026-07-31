@@ -47,6 +47,19 @@ def test_cors_origins_allows_both_localhost_and_loopback_by_default():
     assert "http://127.0.0.1:3000" in s.cors_origins
 
 
+def test_cors_origins_allow_the_playwright_port_by_default():
+    """The e2e suite serves its own build on 3100, away from any dev server.
+
+    Without this the suite's server-rendered reads succeed while every
+    browser-side mutation fails CORS — which presents as a broken app rather
+    than a misconfigured one.
+    """
+    s = Settings(_env_file=None)
+    assert "http://localhost:3100" in s.cors_origins
+
+
 def test_a_single_origin_still_works():
     s = Settings(_env_file=None, frontend_origin="https://folium.app")
+    # The permissive default is development-only: one explicit value replaces it
+    # entirely, so a deployment never inherits a localhost origin.
     assert s.cors_origins == ["https://folium.app"]

@@ -8,6 +8,7 @@ from app.core.constants import empty_doc
 from app.core.exceptions import NotFoundError
 from app.models import Document, DocumentShare, User
 from app.schemas.document import DocumentCreate, DocumentUpdate
+from app.services import versions
 from app.services.permissions import Permission, can_edit, can_view, resolve_permission
 from app.utils.import_file import doc_to_plain_text
 
@@ -99,6 +100,15 @@ async def update_document(
     if data.title is not None:
         document.title = data.title
     if data.content is not None:
+        # Before the assignment, so the row holds the content being replaced —
+        # that is what makes restoring mean "go back" rather than "duplicate
+        # what is already on screen". In the same transaction as the update, so
+        # a failed write cannot leave a snapshot of a state that never existed.
+        #
+        # Title-only updates deliberately snapshot nothing: a title is one
+        # string, retyped in seconds, and copying the whole body because someone
+        # fixed a typo would spend the budget the interval exists to protect.
+        await versions.maybe_snapshot(db, document, user_id)
         document.content = data.content
         document.content_text = doc_to_plain_text(data.content)
 

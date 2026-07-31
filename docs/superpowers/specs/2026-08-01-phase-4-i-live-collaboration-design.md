@@ -73,19 +73,21 @@ see the document gets the same 404 as everywhere else, and only then asks y-swee
 The room id is derived from the document id rather than accepted from the client. A client that could
 name its own room could join a room for a document it cannot read.
 
-### Read-only users, honestly
+### Read-only users
 
-The client token API exposes no documented read-only level, so a `view` collaborator's token is the
-same as an editor's. Three things follow, and the third is the one that matters:
+y-sweet's auth endpoint accepts an authorization level — `full` or `read-only` — so a `view`
+collaborator gets a token the **server** refuses writes for. Read-only does not depend on the browser
+behaving.
 
-1. The editor mounts non-editable for them, as it already does.
-2. They are not offered a toolbar, and the client does not write to the shared document.
-3. **The durable boundary is unchanged:** content reaches Postgres only through `PATCH /documents/{id}`,
-   which enforces `can_edit` and is already tested. A viewer who defeated the client could disturb a
-   live session, but could not persist anything.
+(The published guides show only the default, writable case, and the SDK's convenience method sends an
+empty body. The level is in the API's own types, so the token is requested directly rather than
+through that method. Worth knowing if this ever appears to regress: the SDK helper silently issues
+full access.)
 
-That is a real limitation, not a hidden one. Should y-sweet gain per-token authorization, the token
-endpoint is the single place that changes. Until then it is recorded here and in the README.
+The client is still told its permission, so it can mount the editor non-editable and skip the toolbar
+— that is presentation, not enforcement. And the durable boundary is unchanged either way: content
+reaches Postgres only through `PATCH /documents/{id}`, which enforces `can_edit` and is already
+tested.
 
 ---
 
@@ -181,7 +183,7 @@ CI does not run it: it needs a y-sweet server as well as Supabase credentials. I
 - [ ] Each sees the other's cursor, labelled, in a colour stable across reloads
 - [ ] A document opened for the first time appears once, not twice — the seeding rule holds
 - [ ] Undo undoes your own change, not someone else's
-- [ ] A viewer sees live changes and contributes nothing
+- [ ] A viewer sees live changes and contributes nothing, enforced by a read-only token
 - [ ] With `Y_SWEET_CONNECTION_STRING` unset, the editor works exactly as it did in Phase 3
 - [ ] The room id derives from the document id; a client cannot name its own room
 - [ ] A caller who cannot see the document gets 404 from the token endpoint

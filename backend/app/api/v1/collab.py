@@ -6,6 +6,7 @@ from app.api.deps import CurrentUser, DbSession
 from app.schemas.collab import CollabSession
 from app.services import collab as service
 from app.services import documents as documents_service
+from app.services.permissions import can_edit
 
 router = APIRouter(prefix="/documents/{document_id}/collab", tags=["collaboration"])
 
@@ -22,13 +23,14 @@ async def start_collab_session(
     """
     _, permission = await documents_service.get_document(db, document_id, user.id)
 
-    session = await service.client_token(document_id)
+    session = await service.client_token(document_id, can_write=can_edit(permission))
     if session is None:
         return CollabSession(enabled=False, permission=permission.value)
 
     return CollabSession(
         enabled=True,
         url=session["url"],
+        base_url=session.get("baseUrl"),
         doc_id=session["docId"],
         token=session.get("token"),
         permission=permission.value,

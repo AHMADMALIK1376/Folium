@@ -34,12 +34,13 @@ def configured(monkeypatch):
 @pytest.fixture
 def minted(monkeypatch):
     """Record what the SDK was asked for, and hand back a plausible token."""
-    calls: list[str] = []
+    calls: list[tuple[str, str]] = []
 
-    def fake_mint(doc_id: str) -> dict[str, str]:
-        calls.append(doc_id)
+    def fake_mint(doc_id: str, authorization: str = "full") -> dict[str, str]:
+        calls.append((doc_id, authorization))
         return {
             "url": "ws://localhost:8080/d",
+            "baseUrl": "http://localhost:8080/d",
             "docId": doc_id,
             "token": "a-room-token",
         }
@@ -95,7 +96,10 @@ async def test_configured_returns_a_room_token(
     assert body["enabled"] is True
     assert body["token"] == "a-room-token"
     assert body["url"] == "ws://localhost:8080/d"
+    assert body["base_url"] == "http://localhost:8080/d"
     assert body["permission"] == "owner"
+    # An owner may write, so the token is not restricted.
+    assert minted == [(service.room_id(uuid.UUID(doc_id)), "full")]
 
 
 async def test_the_room_id_comes_from_the_document_not_the_request(
@@ -111,8 +115,8 @@ async def test_the_room_id_comes_from_the_document_not_the_request(
         headers=auth_headers(alice_email),
     )
 
-    assert minted == [service.room_id(uuid.UUID(doc_id))]
-    assert "somebody-elses-room" not in minted
+    assert [doc for doc, _ in minted] == [service.room_id(uuid.UUID(doc_id))]
+    assert "somebody-elses-room" not in [doc for doc, _ in minted]
 
 
 async def test_a_stranger_gets_nothing_and_no_token_is_minted(
@@ -146,9 +150,10 @@ async def test_a_viewer_is_told_they_are_read_only(
     )
 
     assert response.status_code == 200
-    # The client uses this to stay out of the shared document. The durable
-    # boundary is still PATCH, which enforces can_edit.
     assert response.json()["permission"] == "view"
+    # And the token itself is read-only, so the boundary does not depend on the
+    # browser behaving: y-sweet refuses their writes at the server.
+    assert minted == [(service.room_id(uuid.UUID(doc_id)), "read-only")]
 
 
 async def test_a_missing_document_is_not_found(
@@ -171,7 +176,7 @@ async def test_an_unreachable_server_is_unavailable_not_unauthenticated(
     outage must not read as every user's credentials failing.
     """
 
-    def explode(doc_id: str):
+    def explode(doc_id: str, authorization: str = "full"):
         raise service.CollabUnavailableError("y-sweet is unreachable")
 
     monkeypatch.setattr(service, "_mint", explode)

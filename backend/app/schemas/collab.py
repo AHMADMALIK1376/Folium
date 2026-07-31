@@ -11,6 +11,10 @@ class CollabSession(BaseModel):
 
     enabled: bool
     url: str | None = None
+    # The client needs both: `url` is the WebSocket endpoint, `base_url` the
+    # document-level HTTP one. y-sweet's client token carries both, so passing
+    # only one leaves the provider unable to connect.
+    base_url: str | None = None
     doc_id: str | None = None
     token: str | None = None
     # What the caller may do, so a viewer's client knows to stay out of the

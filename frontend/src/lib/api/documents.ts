@@ -4,6 +4,8 @@ import type {
   GrantablePermission,
   Share,
   TipTapDoc,
+  VersionDetail,
+  VersionSummary,
 } from "./types";
 
 /** A partial update. An omitted field means "leave it alone" — the backend
@@ -91,4 +93,33 @@ export function importDocument(file: File): Promise<DocumentDetail> {
     method: "POST",
     body,
   });
+}
+
+/** A document's history, newest first.
+ *
+ * Without content — the backend omits it deliberately, since fifty entries
+ * would otherwise mean fifty full documents. Anyone who can view the document
+ * may list its history. */
+export function listVersions(id: string): Promise<VersionSummary[]> {
+  return apiFetch<VersionSummary[]>(`/api/v1/documents/${id}/versions`);
+}
+
+/** One version, with its content, for previewing before restoring. */
+export function getVersion(id: string, versionId: string): Promise<VersionDetail> {
+  return apiFetch<VersionDetail>(`/api/v1/documents/${id}/versions/${versionId}`);
+}
+
+/** Put the document back to an earlier state.
+ *
+ * Requires edit permission; a viewer gets a 404. Returns the updated document,
+ * so the caller can hand the restored content straight to the editor rather
+ * than re-fetching it. */
+export function restoreVersion(
+  id: string,
+  versionId: string,
+): Promise<DocumentDetail> {
+  return apiFetch<DocumentDetail>(
+    `/api/v1/documents/${id}/versions/${versionId}/restore`,
+    { method: "POST" },
+  );
 }

@@ -29,3 +29,7 @@ htmlcov/
 .playwright-browsers/
 test-results/
 playwright-report/
+
+# Local y-sweet document store, created by `y-sweet serve` during Phase 4
+# development. Machine-local state, never shared.
+.ysweet-data/

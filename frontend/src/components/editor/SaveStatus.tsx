@@ -23,6 +23,10 @@ export function SaveStatus({ status }: { status: Status }) {
     <span
       role="status"
       aria-live="polite"
+      // Named because the editor now has two live regions — this one and the
+      // connection indicator. Without names they are indistinguishable to a
+      // screen reader and ambiguous to a test.
+      aria-label="Save status"
       className={cn(
         "text-sm tabular-nums",
         status === "failed" ? "text-carmine-700" : "text-neutral-500",

@@ -87,7 +87,7 @@ test("an owner grants view, then edit, then revokes it", async ({ browser }) => 
   const body = guest.getByRole("textbox", { name: /document body/i });
   await body.click();
   await guest.keyboard.type("Written by the collaborator");
-  await expect(guest.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(guest.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
   // The owner sees the collaborator's text.
   await owner.keyboard.press("Escape");

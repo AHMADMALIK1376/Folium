@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, DbSession
-from app.schemas.collab import CollabSession
+from app.schemas.collab import CollabSession, CollabUser
 from app.services import collab as service
 from app.services import documents as documents_service
 from app.services.permissions import can_edit
@@ -23,9 +23,13 @@ async def start_collab_session(
     """
     _, permission = await documents_service.get_document(db, document_id, user.id)
 
+    # The caller, already authenticated to decide whether to mint at all — so
+    # the editor needs no second request to learn who it is labelling.
+    caller = CollabUser(id=user.id, email=user.email, display_name=user.display_name)
+
     session = await service.client_token(document_id, can_write=can_edit(permission))
     if session is None:
-        return CollabSession(enabled=False, permission=permission.value)
+        return CollabSession(enabled=False, permission=permission.value, user=caller)
 
     return CollabSession(
         enabled=True,
@@ -34,4 +38,5 @@ async def start_collab_session(
         doc_id=session["docId"],
         token=session.get("token"),
         permission=permission.value,
+        user=caller,
     )

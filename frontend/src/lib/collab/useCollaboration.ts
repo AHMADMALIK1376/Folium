@@ -5,6 +5,13 @@ import { useEffect, useState } from "react";
 import * as Y from "yjs";
 
 import { getCollabSession } from "@/lib/api/documents";
+import type { CollabUser } from "@/lib/api/types";
+
+/** What the user is told about the connection.
+ *
+ * Three states, not the provider's five: "handshaking" and "connecting" are the
+ * same thing to a person waiting. */
+export type ConnectionStatus = "connecting" | "connected" | "offline";
 
 export interface Collaboration {
   /** False until a session is established, and permanently false when the
@@ -17,6 +24,14 @@ export interface Collaboration {
    *  otherwise discard whatever had been typed in between. */
   loading: boolean;
   canWrite: boolean;
+  /** Who this browser is, for the cursor label. Null until the session is
+   *  established, and when collaboration is off — nothing renders a cursor
+   *  then anyway. */
+  user: CollabUser | null;
+  /** Live connection state. Silence was the 4-i behaviour: a disconnected
+   *  editor looked exactly like a live one, while nothing typed into it was
+   *  reaching anybody. */
+  status: ConnectionStatus;
 }
 
 const DISABLED: Collaboration = {
@@ -25,6 +40,8 @@ const DISABLED: Collaboration = {
   doc: null,
   loading: false,
   canWrite: false,
+  user: null,
+  status: "offline",
 };
 
 /** Join a document's collaboration room, if there is one.
@@ -42,6 +59,7 @@ export function useCollaboration(documentId: string): Collaboration {
     let cancelled = false;
     let provider: YSweetProvider | null = null;
     let doc: Y.Doc | null = null;
+    let statusListener: ((event: unknown) => void) | null = null;
 
     const join = async () => {
       try {
@@ -50,7 +68,7 @@ export function useCollaboration(documentId: string): Collaboration {
         // Nothing configured, or the room was refused. Not an error worth
         // showing: the editor still works.
         if (!session.enabled || !session.url || !session.doc_id) {
-          if (!cancelled) setState(DISABLED);
+          if (!cancelled) setState({ ...DISABLED, user: session.user ?? null });
           return;
         }
 
@@ -70,7 +88,28 @@ export function useCollaboration(documentId: string): Collaboration {
           doc,
           loading: false,
           canWrite: session.permission === "owner" || session.permission === "edit",
+          user: session.user,
+          status: "connecting",
         });
+
+        // The provider reconnects on its own, so there is nothing to press —
+        // the honest thing is to report what is happening while it does.
+        const onStatus = (event: unknown) => {
+          const raw =
+            typeof event === "string"
+              ? event
+              : ((event as { status?: string } | null)?.status ?? "");
+          const next: ConnectionStatus =
+            raw === "connected"
+              ? "connected"
+              : raw === "connecting" || raw === "handshaking"
+                ? "connecting"
+                : "offline";
+          if (!cancelled) setState((current) => ({ ...current, status: next }));
+        };
+
+        provider.on("connection-status", onStatus);
+        statusListener = onStatus;
       } catch {
         // 503, a network failure, anything: edit alone.
         if (!cancelled) setState(DISABLED);
@@ -81,6 +120,9 @@ export function useCollaboration(documentId: string): Collaboration {
 
     return () => {
       cancelled = true;
+      if (statusListener && provider) {
+        provider.off("connection-status", statusListener);
+      }
       // Ordering matters: the provider holds a socket bound to this doc, so it
       // goes first. Leaving either behind leaks a connection per navigation.
       provider?.destroy();

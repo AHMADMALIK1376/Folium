@@ -143,12 +143,16 @@ through the API, so version history, the dashboard, and everything else are unaf
 To run one locally, in a third terminal:
 
 ```bash
-cd frontend && ./node_modules/y-sweet/bin/y-sweet serve ../.ysweet-data --port 8080
+cd frontend && npm run collab
 ```
 
 Then set `Y_SWEET_CONNECTION_STRING=ys://127.0.0.1:8080` in `backend/.env` and restart the backend.
 Use `127.0.0.1`, not `localhost` — on Windows the latter tries IPv6 first and costs about two seconds
 per call, which the editor pays twice before it opens.
+
+That script exists rather than calling the binary directly because of two Windows quirks: the
+published binary has no `.exe` extension, so PowerShell offers to *open* it rather than run it, and
+the package's own wrapper exits immediately in some shells while reporting success.
 
 ## Version history
 

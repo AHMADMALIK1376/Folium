@@ -3,15 +3,15 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: the rebuild is complete through Phase 4-i. There is no v1 code left.**
+> **Status: the rebuild is complete through Phase 4. There is no v1 code left.**
 > Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
 > frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
 > stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
 > import, version history with restore, and live collaborative editing.
 >
-> **Still to come:** offline editing and reconnection polish. Live collaboration works when a
-> y-sweet server is configured; without one the editor falls back to single-user autosave, and two
-> people editing at once overwrite each other — which is what version history exists to rescue.
+> **Still to come:** attachments and export. Live collaboration works when a y-sweet server is
+> configured; without one the editor falls back to single-user autosave, and two people editing at
+> once overwrite each other — which is what version history exists to rescue.
 
 ---
 
@@ -27,7 +27,8 @@ share them with other people.
 | [2C-iii](docs/superpowers/plans/2026-07-30-phase-2c-iii-sharing-import.md) | Sharing with permission levels, file import, and deleting all v1 code | Done |
 | [3](docs/superpowers/plans/2026-08-01-phase-3-version-history.md) | Version history: snapshots as you edit, preview, and restore | Done |
 | [4-i](docs/superpowers/plans/2026-08-01-phase-4-i-live-collaboration.md) | Live collaboration: shared editing with cursors, over y-sweet | Done |
-| 4-ii | Reconnection, offline behaviour, and server-side reconciliation | Next |
+| [4-ii](docs/superpowers/plans/2026-08-01-phase-4-ii-collaboration-durability.md) | Cursor identity, a connection indicator, and repairing stale documents | Done |
+| 5 | Attachments UI, and export to PDF/Markdown | Next |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -137,8 +138,16 @@ one document see each other's text and cursors as they type; without it, the edi
 it does alone. A viewer receives a **read-only room token**, so the server itself refuses their writes
 rather than trusting the browser.
 
+Each person's caret carries their own name and a colour derived from their user id, so they are the
+same colour to everyone and after a reload. The editor also says whether it is **Live**, connecting,
+or offline — separately from the save indicator, because "my work is in the database" and "other
+people can see it" are different questions that fail independently.
+
 Postgres stays the record of truth: the client that made a change still saves the merged document
-through the API, so version history, the dashboard, and everything else are unaffected.
+through the API, so version history, the dashboard, and everything else are unaffected. If everyone
+closes their browser before autosave fires, the merged text lives only in the room — so when a client
+next syncs and finds the room ahead of the database, it writes it back. The next person to open the
+document repairs the record.
 
 To run one locally, in a third terminal:
 

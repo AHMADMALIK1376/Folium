@@ -10,8 +10,14 @@ the summary and the reasoning.
 
 # Part 1 — v2: the production architecture
 
-**Status: implemented through Phase 4-i.** Version history and live collaboration are built; offline
-editing and reconnection are Phase 4-ii.
+**Status: implemented through Phase 4.** Version history and live collaboration are built, including
+cursor identity, a connection indicator, and recovery when a room is ahead of the database.
+
+Reconciliation runs **in the browser**, not the server, and that is a constraint rather than a
+preference: `y-sweet-sdk` pins `pycrdt` below the version that gained XML types, so reading a Yjs
+document in Python would mean breaking the pin or hand-writing a decoder to duplicate a conversion the
+browser already performs correctly. A client that syncs holds both copies, so it is also the one place
+where the comparison is free.
 
 The collaboration service is **y-sweet**, chosen over the better-known alternative for one structural
 reason: it has a Python SDK, so the function that checks whether a caller may open a document and the

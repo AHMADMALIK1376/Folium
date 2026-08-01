@@ -16,6 +16,8 @@ import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
 import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
+// Aliased: TipTap's Collaboration extension already owns that name here.
+import type { Collaboration as CollaborationState } from "@/lib/collab/useCollaboration";
 import { cursorColor } from "@/lib/collab/color";
 import { useCollaboration } from "@/lib/collab/useCollaboration";
 import { useAutosave } from "@/lib/hooks/useAutosave";
@@ -29,7 +31,21 @@ function canEdit(document: DocumentDetail) {
   return document.permission === "owner" || document.permission === "edit";
 }
 
-export function DocumentEditor({ document }: { document: DocumentDetail }) {
+/** The editor itself, mounted only once collaboration has resolved one way or
+ *  the other.
+ *
+ *  That is the whole reason this is a separate component. When the collaboration
+ *  state arrived while this was already mounted, the extension list changed,
+ *  TipTap tore the editor down and built a new one — and everything typed in the
+ *  intervening seconds went with it. Deciding first and mounting once means the
+ *  editor is built with its final configuration and never rebuilt. */
+function DocumentEditorSurface({
+  document,
+  collab,
+}: {
+  document: DocumentDetail;
+  collab: CollaborationState;
+}) {
   const router = useRouter();
   const editable = canEdit(document);
   const [title, setTitle] = useState(document.title);
@@ -53,8 +69,6 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
     [document.id, router],
   );
   const { status, error, schedule, flush } = useAutosave({ save });
-
-  const collab = useCollaboration(document.id);
 
   const editor = useEditor({
     extensions: [
@@ -117,8 +131,9 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
       schedule({ content: editor.getJSON() as TipTapDoc });
     },
   },
-  // Rebuilt when collaboration arrives: the extension list and the content
-  // seeding both depend on it, and the token request resolves after mount.
+  // Constant for this component's lifetime: it mounts only after collaboration
+  // has resolved, so these never change and the editor is never rebuilt. Listed
+  // anyway, because the configuration above genuinely depends on them.
   [collab.enabled, collab.doc, collab.provider]);
 
   useEffect(() => {
@@ -252,4 +267,37 @@ export function DocumentEditor({ document }: { document: DocumentDetail }) {
       <EditorContent editor={editor} />
     </div>
   );
+}
+
+/** Decide whether this document is collaborative, then mount the editor.
+ *
+ * Nothing is rendered into the editing surface until that is known. The wait is
+ * a network round trip to mint a room token — normally imperceptible, and
+ * always preferable to mounting an editor that has to be replaced, which is how
+ * typing got discarded before.
+ */
+export function DocumentEditor({ document }: { document: DocumentDetail }) {
+  const collab = useCollaboration(document.id);
+
+  if (collab.loading) {
+    return (
+      <div className="rounded-lg border border-neutral-200 bg-white">
+        <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3">
+          <Link
+            href="/dashboard"
+            prefetch={false}
+            className="text-sm text-neutral-500 hover:text-carmine-500"
+          >
+            ← Documents
+          </Link>
+          <h1 className="min-w-0 flex-1 truncate px-2 py-1 text-lg font-medium text-neutral-900">
+            {document.title}
+          </h1>
+        </div>
+        <p className="px-6 py-5 text-sm text-neutral-500">Opening…</p>
+      </div>
+    );
+  }
+
+  return <DocumentEditorSurface document={document} collab={collab} />;
 }

@@ -10,8 +10,17 @@ the summary and the reasoning.
 
 # Part 1 — v2: the production architecture
 
-**Status: implemented through Phase 2C. Real-time collaboration and version history are Phase 3 and
-are marked as such below.**
+**Status: implemented through Phase 4-i.** Version history and live collaboration are built; offline
+editing and reconnection are Phase 4-ii.
+
+The collaboration service is **y-sweet**, chosen over the better-known alternative for one structural
+reason: it has a Python SDK, so the function that checks whether a caller may open a document and the
+function that mints its room token are the same function, in the service that owns every other
+permission decision. The alternative documents only a Node SDK for issuing tokens, which would have
+meant a Next.js route handler holding the vendor secret — reintroducing the server-side-in-Next
+arrangement Phase 2C-iii deleted. y-sweet is also MIT-licensed and self-hostable, so the vendor is
+replaceable rather than load-bearing, which is the same principle as keeping Postgres the record of
+truth.
 
 ## Summary
 

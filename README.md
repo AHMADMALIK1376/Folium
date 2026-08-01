@@ -3,14 +3,15 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: the rebuild is complete through Phase 3. There is no v1 code left.**
+> **Status: the rebuild is complete through Phase 4-i. There is no v1 code left.**
 > Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
 > frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
 > stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
-> import, and version history with restore.
+> import, version history with restore, and live collaborative editing.
 >
-> **Still to come:** live collaboration with multiple cursors. Editing today is last-write-wins —
-> two people in one document overwrite each other, which is what version history exists to rescue.
+> **Still to come:** offline editing and reconnection polish. Live collaboration works when a
+> y-sweet server is configured; without one the editor falls back to single-user autosave, and two
+> people editing at once overwrite each other — which is what version history exists to rescue.
 
 ---
 
@@ -25,7 +26,8 @@ share them with other people.
 | [2C-ii](docs/superpowers/plans/2026-07-30-phase-2c-ii-editor.md) | The editor: open a document, edit it, rename it, autosave as TipTap JSON | Done |
 | [2C-iii](docs/superpowers/plans/2026-07-30-phase-2c-iii-sharing-import.md) | Sharing with permission levels, file import, and deleting all v1 code | Done |
 | [3](docs/superpowers/plans/2026-08-01-phase-3-version-history.md) | Version history: snapshots as you edit, preview, and restore | Done |
-| 4 | Live collaboration with multiple cursors | Next |
+| [4-i](docs/superpowers/plans/2026-08-01-phase-4-i-live-collaboration.md) | Live collaboration: shared editing with cursors, over y-sweet | Done |
+| 4-ii | Reconnection, offline behaviour, and server-side reconciliation | Next |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -42,7 +44,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 | Content storage | HTML string | TipTap JSON |
 | Sharing | Binary — has access or doesn't | View / comment / edit permissions |
 | Deletion | Permanent | Soft delete with a trash folder |
-| Collaboration | Autosave, refresh to see others' edits | Autosave — live editing is Phase 4 |
+| Collaboration | Autosave, refresh to see others' edits | Live shared editing with cursors |
 | History | None | Version snapshots with restore |
 
 ## What it does
@@ -52,6 +54,8 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Import a `.txt` or `.md` file as a new document.
 - Share a document by email with view or edit access, change someone's level, or revoke it. The
   dashboard separates documents you own from documents shared with you.
+- Edit a document with someone else at the same time, seeing their cursor and their text as they
+  type — when a collaboration server is configured.
 - Browse a document's version history, preview an earlier draft, and restore it.
 - Delete a document and restore it from the trash.
 - Everything persists and survives a refresh or a server restart.
@@ -70,8 +74,9 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 | Real-time | Managed collaboration service |
 | Hosting | Vercel (frontend) + Render or Fly.io (backend) |
 
-Everything above is in place except real-time collaboration, which is Phase 4. Editing today is
-last-write-wins: two people in one document overwrite each other.
+Real-time uses [y-sweet](https://github.com/jamsocket/y-sweet), an MIT-licensed Yjs host that can be
+self-hosted or run on Jamsocket. It is optional: with no server configured, editing is last-write-wins
+and everything else is unchanged.
 
 Note that **Next.js is React** — it is a framework built on top of React, not an alternative to it.
 
@@ -125,6 +130,26 @@ rejection and enforced by the backend, which does the conversion.
   `**bold**`, `*italic*`, and `-`/numbered lists. It is **not** a full CommonMark parser — no tables,
   code blocks, links, or nested lists.
 
+## Live collaboration
+
+Optional, and off unless the backend has `Y_SWEET_CONNECTION_STRING` set. With it, two people editing
+one document see each other's text and cursors as they type; without it, the editor behaves exactly as
+it does alone. A viewer receives a **read-only room token**, so the server itself refuses their writes
+rather than trusting the browser.
+
+Postgres stays the record of truth: the client that made a change still saves the merged document
+through the API, so version history, the dashboard, and everything else are unaffected.
+
+To run one locally, in a third terminal:
+
+```bash
+cd frontend && ./node_modules/y-sweet/bin/y-sweet serve ../.ysweet-data --port 8080
+```
+
+Then set `Y_SWEET_CONNECTION_STRING=ys://127.0.0.1:8080` in `backend/.env` and restart the backend.
+Use `127.0.0.1`, not `localhost` — on Windows the latter tries IPv6 first and costs about two seconds
+per call, which the editor pays twice before it opens.
+
 ## Version history
 
 Every document keeps earlier drafts, saved as you edit. Open one and click **History** to preview a
@@ -177,8 +202,9 @@ DEPLOY.md               deployment guide
 
 ## Known limitations
 
-- **No real-time collaboration.** Autosave only; two people editing one document overwrite each
-  other — recoverable from version history, but not prevented. Phase 4.
+- **Real-time collaboration needs a y-sweet server.** Without one the editor still works, but two
+  people editing at once overwrite each other — recoverable from version history, not prevented.
+- **No offline editing.** Losing the connection mid-session is Phase 4-ii.
 - **Version history is automatic, not manual.** A snapshot is kept at most every five minutes per
   author, and only the newest 50 per document, so the very last keystrokes before a mistake may not
   have their own version.

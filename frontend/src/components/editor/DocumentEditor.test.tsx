@@ -105,7 +105,9 @@ describe("DocumentEditor", () => {
     expect(screen.queryByRole("button", { name: /bold/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: /document title/i })).not.toBeInTheDocument();
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
-    expect(screen.getByText(/quarterly plan/i)).toBeInTheDocument();
+    // Two copies of the title exist: the one on screen, and a print-only
+    // heading, because printing hides the whole header row.
+    expect(screen.getAllByText(/quarterly plan/i).length).toBeGreaterThan(0);
   });
 
   it("treats comment permission as read-only this phase", () => {

@@ -218,3 +218,68 @@
 .folium-prose:focus-visible {
   outline: none;
 }
+
+/* Printing, which is also how a PDF is made.
+   No PDF library on either side: an Export action opens the browser's print
+   dialog, where every current OS offers "Save as PDF". What follows is the
+   actual work — printing the page as it stands would produce the application
+   rather than the document. */
+@media print {
+  /* Everything that is interface. The editor's own header carries the title
+     input, the save and connection indicators, and the dialog triggers; the
+     printed page gets a plain heading instead, below. */
+  header,
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"],
+  [role="toolbar"],
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Collaboration carets are absolutely positioned overlays. On screen they
+     are other people; on paper they are stray marks in the margin. */
+  .collaboration-cursor__caret,
+  .collaboration-cursor__label {
+    display: none !important;
+  }
+
+  /* The editor reserves 60vh so an empty document is still a target to click.
+     On paper that forces a mostly-blank first page. */
+  .folium-prose {
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+
+  body,
+  main {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Borders and rounding belong to the application, not to a printed page. */
+  main * {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* A heading stranded at the foot of a page, or a list item split across two,
+     is the difference between a printout and a document. */
+  .folium-prose h1,
+  .folium-prose h2 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .folium-prose li,
+  .folium-prose p {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    margin: 20mm;
+  }
+}

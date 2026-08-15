@@ -13,6 +13,7 @@ import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { ExportDialog } from "@/components/editor/ExportDialog";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
@@ -214,7 +215,10 @@ function DocumentEditorSurface({
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white">
-      <div className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-3">
+      <div
+        data-print-hide
+        className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-3"
+      >
         <Link
           href="/dashboard"
           // Not prefetched, deliberately. A prefetch of the dashboard happens
@@ -247,6 +251,9 @@ function DocumentEditorSurface({
         {/* Only when there is a room to be connected to. With collaboration off
             there is nothing to report, and an indicator would imply otherwise. */}
         {collab.enabled && <ConnectionStatus status={collab.status} />}
+
+        {/* Offered whatever the permission: exporting is reading. */}
+        <ExportDialog documentId={document.id} />
 
         <HistoryDialog
           documentId={document.id}
@@ -285,6 +292,12 @@ function DocumentEditorSurface({
           />
         </div>
       )}
+
+      {/* Screen shows the title in the header above; print hides that whole row,
+          so the printed page needs a heading of its own. */}
+      <h1 className="hidden px-6 pt-6 text-2xl font-semibold text-neutral-900 print:block">
+        {title}
+      </h1>
 
       {editor && editable && <EditorToolbar editor={editor} />}
       <EditorContent editor={editor} />

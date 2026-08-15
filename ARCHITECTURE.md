@@ -118,6 +118,22 @@ Two properties are carried over from v1 unchanged, because they were already rig
 - **`can_access_document` stays a pure function** with no database calls inside it, so it can be unit
   tested directly rather than through an HTTP round-trip.
 
+**External services get exactly one module each, and that module is the test seam.** `services/collab.py`
+mints y-sweet room tokens; `services/storage.py` is the only thing that speaks to Supabase Storage.
+Nothing else in the codebase knows that either is HTTP, which is what lets the attachment tests run
+with no bucket, no key, and no network — the boundary is replaced wholesale.
+
+Both follow the same rule about failure: an outage raises a domain error that maps to **503**, never
+a 404 and never a 500. Phase 2A drew that line for JWKS and it holds throughout — infrastructure
+being unreachable must never be indistinguishable from "you may not see this."
+
+**Permission stays in the backend even where the vendor could enforce it.** Attachments are stored
+with a service-role key that bypasses row-level security, and every access decision is made here
+first, by the same `resolve_permission` every other route uses. Pushing it into RLS policies would
+mean expressing Folium's ownership-and-shares model a second time in SQL; two implementations of one
+permission model drift, and the first disagreement is someone reading a document they were removed
+from.
+
 ## The data model, and what changed
 
 Five tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`. The full

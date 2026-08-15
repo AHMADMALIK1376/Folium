@@ -3,16 +3,17 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: the rebuild is complete through Phase 5-i. There is no v1 code left.**
+> **Status: the rebuild is complete. The roadmap is finished, and there is no v1 code left.**
 > Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
 > frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
 > stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
-> import and export, version history with restore, and live collaborative editing.
+> import and export, version history with restore, attachments, and live collaborative editing.
 >
-> **Still to come:** attachments, which need a storage bucket and a service-role key. Live
-> collaboration works when a y-sweet server is configured; without one the editor falls back to
-> single-user autosave, and two people editing at once overwrite each other — which is what version
-> history exists to rescue.
+> Two features are optional and configuration-gated, by design rather than by omission: **live
+> collaboration** needs a y-sweet server, and **attachments** need a Supabase Storage bucket and a
+> service-role key. Without either, the rest of the app is unchanged — without y-sweet the editor
+> falls back to single-user autosave, and two people editing at once overwrite each other, which is
+> what version history exists to rescue.
 
 ---
 
@@ -30,7 +31,7 @@ share them with other people.
 | [4-i](docs/superpowers/plans/2026-08-01-phase-4-i-live-collaboration.md) | Live collaboration: shared editing with cursors, over y-sweet | Done |
 | [4-ii](docs/superpowers/plans/2026-08-01-phase-4-ii-collaboration-durability.md) | Cursor identity, a connection indicator, and repairing stale documents | Done |
 | [5-i](docs/superpowers/plans/2026-08-01-phase-5-i-export.md) | Export: download as Markdown, or print as a PDF | Done |
-| 5-ii | Attachments, stored in Supabase Storage | Blocked on a bucket and a service-role key |
+| [5-ii](docs/superpowers/plans/2026-08-15-phase-5-ii-attachments.md) | Attachments, stored in Supabase Storage | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -52,10 +53,12 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 
 ## What it does
 
-- Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
-  bulleted/numbered lists — with autosave.
+- Create, rename, and edit rich-text documents — bold, italic, underline, strikethrough, inline code,
+  headings, quotes, code blocks, rules, and bulleted/numbered lists — with autosave.
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
+- Attach files to a document — images, PDFs, and text — and download them again, when a storage
+  bucket is configured.
 - Share a document by email with view or edit access, change someone's level, or revoke it. The
   dashboard separates documents you own from documents shared with you.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
@@ -130,9 +133,38 @@ Supported types: **`.txt` and `.md`/`.markdown` only**, max 2MB — checked in t
 rejection and enforced by the backend, which does the conversion.
 
 - `.txt` files split into paragraphs on blank lines.
-- `.md` files pass through a small dependency-free converter handling `#`/`##`/`###` headings,
-  `**bold**`, `*italic*`, and `-`/numbered lists. It is **not** a full CommonMark parser — no tables,
-  code blocks, links, or nested lists.
+- `.md` files pass through a small dependency-free converter. It is **not** a full CommonMark parser,
+  and it handles exactly what the editor can produce — see the table below.
+
+### What the converters carry
+
+Import and export are inverses, and the set is not a matter of taste: it is **every node and mark the
+editor's schema permits**, which is recorded in [`editor-schema.json`](editor-schema.json) and checked
+from both sides by tests. Add a TipTap extension and those tests fail until the converter is taught
+what to do with it.
+
+| | Markdown |
+|---|---|
+| Headings | `#`, `##`, `###` |
+| Bold, italic | `**`, `*` |
+| Underline | `<u>` — Markdown has no underline and the editor offers one |
+| Strikethrough | `~~` |
+| Inline code | `` ` `` — **contents are never escaped** |
+| Code blocks | fenced, with the language preserved |
+| Blockquotes | `>` |
+| Lists | `-` and numbered |
+| Horizontal rules | `---` |
+| Line breaks | trailing `\` |
+
+Still unsupported, in both directions: tables, links, images, nested lists, and lists inside quotes.
+
+> **A bug worth recording.** Until Phase 6-i, `StarterKit` enabled blockquotes, code blocks,
+> strikethrough and hard breaks — reachable by shortcut, by input rule and by paste — while the
+> converter handled only headings, paragraphs and lists, and skipped everything else in silence. A
+> document whose body was a quote **exported as an empty file**. The round-trip test could not catch
+> it: it started from Markdown, so it only ever exercised what the *importer* could produce, and
+> underline, blockquote and code blocks were invisible to it by construction. The tests now run the
+> other direction too — document to Markdown and back.
 
 ## Export
 
@@ -162,6 +194,55 @@ header, toolbar, status indicators, dialogs, and collaboration cursors all disap
 title and the document on a white page that breaks between blocks rather than through a heading.
 
 Exporting a specific version from history is not supported; history restores in place instead.
+
+## Attachments
+
+Files attached to a document, listed below the editor. Optional, and off unless the backend has
+`SUPABASE_SERVICE_ROLE_KEY` set — without it the panel is absent entirely, because an unconfigured
+feature is not a broken one.
+
+| | |
+|---|---|
+| Types | PNG, JPEG, GIF, WebP, PDF, `.txt`, `.md`, `.csv` |
+| Maximum size | 10MB per file |
+| Maximum per document | 20 |
+| Upload, remove | Requires **edit** permission |
+| List, download | Requires **view** — anyone who can read the document |
+
+**SVG is deliberately not allowed**, despite being an image: it is a document format that can carry
+script, and attachments are served from a URL the user is invited to open. Nothing else on the list
+can execute.
+
+The **content type comes from the file's extension, never from the request** — a browser-supplied
+type is a claim by the uploader, and storing it unchecked would serve the bytes back under a type
+they are not. The stored path contains no part of the filename either, only two ids, so a name like
+`../../etc/passwd.png` cannot escape anywhere. The original name is kept in the database for display.
+
+Uploads go through the backend, which checks permission and validates the file before forwarding it.
+Downloads do not: the backend returns a **short-lived signed URL** and the browser fetches from
+Supabase Storage directly, so a free-tier Python host never streams file bytes. Those URLs are minted
+per download rather than with the list, because they expire.
+
+Deleting a document does **not** delete its attachments. `DELETE /documents/{id}` is a soft delete
+into the trash and is meant to be undone, so the files have to outlive it — a restore that returned a
+document without its attachments would be the worse bug.
+
+### Setting it up
+
+One bucket per Supabase project, created once:
+
+```bash
+cd backend && .venv/Scripts/python scripts/create_storage_bucket.py
+```
+
+Then put the **service_role** key from *Project Settings → API* into `backend/.env` as
+`SUPABASE_SERVICE_ROLE_KEY` and restart the backend. That key bypasses row-level security — treat it
+like a database password, keep it out of git, and use your development project's key locally.
+
+It is the backend's alone; the browser never sees it. Letting the browser upload straight to Storage
+would need no key, but access would then be enforced by SQL policies on `storage.objects` — a second
+implementation of Folium's ownership-and-shares rules, in another language, to keep in step by hand.
+One source of truth is worth one secret.
 
 ## Live collaboration
 
@@ -255,13 +336,25 @@ DEPLOY.md               deployment guide
 - **Version history is automatic, not manual.** A snapshot is kept at most every five minutes per
   author, and only the newest 50 per document, so the very last keystrokes before a mistake may not
   have their own version.
-- **Markdown import and export are minimal** — headings, bold, italic, underline, and lists only.
-  The two match deliberately, so a round trip is lossless; anything outside that set is not supported
-  in either direction.
+- **Markdown import and export cover what the editor can produce, and no more** — see the table under
+  File import. The two match deliberately, so a round trip is lossless. Tables, links, images and
+  nested lists are unsupported in both directions.
+- **Text colour, alignment, and fonts are deliberately absent.** Markdown cannot express them, so
+  adding them would mean either emitting HTML the importer would have to parse or giving up the
+  lossless round trip. That trade belongs to a phase that decides it openly, not to a colour button.
 - **PDF export is the browser's print dialog**, so the browser chooses the filename and the output
   varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
   that has not signed up fails rather than waiting for them.
+- **Attachments are a list, not part of the document.** They sit below the editor; an image cannot be
+  placed inline in the text, which would mean TipTap schema changes and a round trip through import
+  and export.
+- **Attachments are not versioned**, and restoring an earlier draft does not restore the files that
+  were attached at the time.
+- **Attachments are not scanned.** The defence is the extension allow-list, the exclusion of SVG, and
+  the fact that files are served from a signed URL on a different origin.
+- **Deleting a document leaves its attachments in storage**, because the delete is reversible. There
+  is no permanent delete, so nothing removes them.
 - **No comments**, though the permission model already carries a `comment` level for them.
 
 ## Development

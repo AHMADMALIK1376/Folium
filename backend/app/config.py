@@ -28,11 +28,28 @@ class Settings(BaseSettings):
 
     # Supabase project URL, e.g. https://abc.supabase.co. The issuer and JWKS
     # URL are derived from it rather than configured separately so they cannot
-    # drift apart. Deliberately no SUPABASE_SERVICE_ROLE_KEY: this service only
-    # verifies tokens and never calls Supabase's admin API.
+    # drift apart.
     supabase_url: str = ""
 
     jwks_cache_ttl_seconds: int = 600
+
+    # Supabase service-role key, used for exactly one thing: reading and writing
+    # attachment objects in Storage. It bypasses RLS, so it is the most
+    # dangerous value in this file and must never reach the browser — nothing
+    # here is served to the frontend, and NEXT_PUBLIC_* is the frontend's own
+    # config.
+    #
+    # Phase 5-ii took this on deliberately, having weighed the alternative:
+    # letting the browser upload straight to Storage under RLS policies would
+    # need no key, but it would express Folium's ownership-plus-shares rules a
+    # second time in SQL. Two implementations of one permission model drift, and
+    # the first disagreement is someone reading a document they were removed
+    # from. One source of truth is worth one secret.
+    #
+    # Blank by default, and blank means attachments are simply off — the routes
+    # answer 503 and the editor omits the panel. CI holds no Supabase
+    # credentials and must still run the whole suite.
+    supabase_service_role_key: str = ""
 
     # Connection string for a y-sweet server, e.g.
     # ys://<token>@localhost:8080 locally, or the Jamsocket-issued value.
@@ -50,6 +67,15 @@ class Settings(BaseSettings):
     @property
     def collaboration_enabled(self) -> bool:
         return bool(self.y_sweet_connection_string.strip())
+
+    @property
+    def attachments_enabled(self) -> bool:
+        """Attachments need both a project to talk to and a key to talk with."""
+        return bool(self.supabase_service_role_key.strip() and self.supabase_url.strip())
+
+    @property
+    def storage_url(self) -> str:
+        return f"{self._supabase_base}/storage/v1"
 
     @property
     def cors_origins(self) -> list[str]:

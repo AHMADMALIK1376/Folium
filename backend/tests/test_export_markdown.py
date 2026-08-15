@@ -164,3 +164,147 @@ def test_the_round_trip_preserves_an_asterisk_as_text():
     # And the text really is a bare asterisk, not an escape sequence left behind.
     assert "*" in round_tripped["content"][0]["content"][0]["text"]
     assert "\\" not in round_tripped["content"][0]["content"][0]["text"]
+
+
+# --- Phase 6-i: the types StarterKit always allowed and export always dropped ---
+
+
+def code_block(code: str, language=None) -> dict:
+    return {
+        "type": "codeBlock",
+        "attrs": {"language": language},
+        "content": [{"type": "text", "text": code}] if code else [],
+    }
+
+
+def test_a_blockquote_is_not_swallowed():
+    """The bug this phase exists for: a document made of a quote exported as an
+    empty file, and had done since Phase 1."""
+    result = doc_to_markdown(
+        doc({"type": "blockquote", "content": [paragraph(text("Quoted words"))]})
+    )
+
+    assert result == "> Quoted words"
+
+
+def test_a_multi_paragraph_quote_keeps_both_paragraphs():
+    result = doc_to_markdown(
+        doc(
+            {
+                "type": "blockquote",
+                "content": [paragraph(text("First")), paragraph(text("Second"))],
+            }
+        )
+    )
+
+    assert "> First" in result
+    assert "> Second" in result
+
+
+def test_a_code_block_is_not_swallowed():
+    assert doc_to_markdown(doc(code_block("print(1)"))) == "```\nprint(1)\n```"
+
+
+def test_a_code_block_keeps_its_language():
+    assert doc_to_markdown(doc(code_block("print(1)", "python"))).startswith("```python")
+
+
+def test_an_empty_code_block_is_still_a_fence():
+    """Not an empty string, which would vanish on re-import."""
+    assert doc_to_markdown(doc(code_block(""))) == "```\n\n```"
+
+
+def test_a_fence_grows_past_backticks_in_the_code():
+    """A sample containing ``` would otherwise close the block early and spill
+    the rest of the document into it."""
+    result = doc_to_markdown(doc(code_block("here is ``` a fence")))
+
+    assert result.startswith("````")
+    assert result.endswith("````")
+    assert markdown_to_doc(result) == doc(code_block("here is ``` a fence"))
+
+
+def test_markdown_inside_a_code_block_is_not_escaped():
+    """A backslash added to someone's code changes the code."""
+    result = doc_to_markdown(doc(code_block("weight = a ** b  # ** not bold")))
+
+    assert r"\*" not in result
+    assert "a ** b" in result
+
+
+def test_markdown_inside_an_inline_code_span_is_not_escaped():
+    result = doc_to_markdown(doc(paragraph(text("call ", None), text("a*b", "code"))))
+
+    assert "`a*b`" in result
+    assert r"\*" not in result
+
+
+def test_strikethrough_survives():
+    assert doc_to_markdown(doc(paragraph(text("gone", "strike")))) == "~~gone~~"
+
+
+def test_a_horizontal_rule_survives():
+    assert doc_to_markdown(doc({"type": "horizontalRule"})) == "---"
+
+
+def test_a_hard_break_does_not_merge_the_lines():
+    result = doc_to_markdown(
+        doc({"type": "paragraph", "content": [text("one"), {"type": "hardBreak"}, text("two")]})
+    )
+
+    # A backslash, then a newline: Markdown's unambiguous line break.
+    assert result == "one\\\ntwo"
+    assert "onetwo" not in result
+
+
+def test_underline_survives_a_round_trip():
+    """It exported correctly from Phase 5-i but came back as literal <u> text,
+    because the round-trip test started from Markdown and the importer could
+    never produce an underline to begin with."""
+    original = doc(paragraph(text("stressed", "underline")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+RICH_ROUND_TRIP_SOURCE = """# A heading
+
+> A quoted line
+
+```python
+weight = a ** b  # ** is not bold, and this # is not a heading
+```
+
+Some ~~struck~~ text with `a*b` inline code.
+
+---
+
+A line\
+broken in two.
+"""
+
+
+def test_the_richer_round_trip_holds():
+    """The types Phase 6-i added, through import, export, and import again."""
+    original = markdown_to_doc(RICH_ROUND_TRIP_SOURCE)
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_markdown_inside_a_fence_is_never_parsed():
+    original = markdown_to_doc("```\n# not a heading\n- not a list\n```")
+    [block] = original["content"]
+
+    assert block["type"] == "codeBlock"
+    assert block["content"][0]["text"] == "# not a heading\n- not a list"
+
+
+def test_a_rule_is_not_read_as_a_bullet():
+    [block] = markdown_to_doc("---")["content"]
+
+    assert block["type"] == "horizontalRule"
+
+
+def test_a_paragraph_that_looks_like_a_rule_stays_a_paragraph():
+    original = doc(paragraph(text("---")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original

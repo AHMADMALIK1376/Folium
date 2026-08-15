@@ -8,12 +8,30 @@ BULLET_RE = re.compile(r"^[-*]\s+(.*)$")
 NUMBERED_RE = re.compile(r"^\d+\.\s+(.*)$")
 BOLD_RE = re.compile(r"(?<!\\)\*\*(.+?)(?<!\\)\*\*")
 ITALIC_RE = re.compile(r"(?<!\\)(?<!\*)\*(?!\*)(.+?)(?<!\\)\*(?!\*)")
+QUOTE_RE = re.compile(r"^>\s?(.*)$")
+FENCE_RE = re.compile(r"^(`{3,})(.*)$")
+RULE_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
 
-# Only what this pair would otherwise misread: a backslash, the emphasis
-# marker, and the three characters that give a line a meaning of its own.
-# Escaping more would make exported files uglier without making them safer,
-# because nothing else here is a delimiter.
-ESCAPED_RE = re.compile(r"\\([\\*#\-.])")
+# Every delimiter this module can misread, and nothing more. Adding a character
+# here means adding it to ESCAPED_RE too: the two must reverse each other
+# exactly, or a round trip loses text.
+ESCAPED_RE = re.compile(r"\\([\\*#\-.`~>])")
+
+# Marks, in the order they must be matched.
+#
+# `code` comes first and wins, because its content is literal: a backtick span
+# containing ** is code that happens to contain asterisks, not bold. Underline
+# precedes the emphasis markers for the same reason — <u> is HTML this module
+# emits itself, and leaving it to be picked apart by * matching would corrupt it.
+_INLINE_PATTERN = re.compile(
+    r"(?P<code>(?<!\\)`(?P<code_text>[^`]+)`)"
+    r"|(?P<underline><u>(?P<underline_text>.+?)</u>)"
+    r"|(?P<bold>(?<!\\)\*\*(?P<bold_text>.+?)(?<!\\)\*\*)"
+    r"|(?P<strike>(?<!\\)~~(?P<strike_text>.+?)(?<!\\)~~)"
+    r"|(?P<italic>(?<!\\)(?<!\*)\*(?!\*)(?P<italic_text>.+?)(?<!\\)\*(?!\*))"
+)
+
+_MARK_NAMES = ("code", "underline", "bold", "strike", "italic")
 
 
 def _unescape(text: str) -> str:
@@ -34,21 +52,27 @@ def _text_node(text: str, mark: str | None = None) -> dict[str, Any]:
 
 
 def _inline(text: str) -> list[dict[str, Any]]:
-    """Split a line into TipTap text nodes, applying bold and italic marks.
+    """Split a line into TipTap text nodes, applying marks.
 
-    Bold is matched first so that ** is never mistaken for a pair of italics.
+    Bold is matched before italic so that ** is never read as a pair of single
+    asterisks, and code before everything, because its content is literal.
     """
     nodes: list[dict[str, Any]] = []
     pos = 0
-    pattern = re.compile(f"({BOLD_RE.pattern})|({ITALIC_RE.pattern})")
 
-    for match in pattern.finditer(text):
+    for match in _INLINE_PATTERN.finditer(text):
         if match.start() > pos:
             nodes.append(_text_node(_unescape(text[pos : match.start()])))
-        if match.group(2) is not None:
-            nodes.append(_text_node(_unescape(match.group(2)), "bold"))
-        else:
-            nodes.append(_text_node(_unescape(match.group(4)), "italic"))
+
+        for name in _MARK_NAMES:
+            if match.group(name) is None:
+                continue
+            body = match.group(f"{name}_text")
+            # Not unescaped inside code: a backslash there is a character in the
+            # sample, and removing it changes the code.
+            nodes.append(_text_node(body if name == "code" else _unescape(body), name))
+            break
+
         pos = match.end()
 
     if pos < len(text):
@@ -58,6 +82,24 @@ def _inline(text: str) -> list[dict[str, Any]]:
         nodes.append(_text_node(_unescape(text)))
 
     return nodes
+
+
+def _paragraph_from_lines(lines: list[str]) -> dict[str, Any]:
+    r"""Build one paragraph from lines joined by hard breaks.
+
+    A trailing backslash means "same paragraph, new line" — TipTap's hardBreak.
+    Markdown's other spelling is two trailing spaces, which is invisible in a
+    diff and stripped by most editors, so the backslash is what this module
+    emits and the only one it needs to read.
+    """
+    content: list[dict[str, Any]] = []
+
+    for index, line in enumerate(lines):
+        if index:
+            content.append({"type": "hardBreak"})
+        content.extend(_inline(line))
+
+    return {"type": "paragraph", "content": content} if content else {"type": "paragraph"}
 
 
 def _paragraph(text: str) -> dict[str, Any]:
@@ -90,8 +132,54 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
             content.append(list_node)
             list_node = None
 
-    for raw in lines:
+    index = 0
+    while index < len(lines):
+        raw = lines[index]
         line = raw.rstrip()
+
+        # A fence is checked before every other rule, and consumes its own
+        # lines. Nothing inside it is Markdown: a "# " in a code sample is a
+        # comment, and letting the heading rule see it would rewrite the code.
+        if fence := FENCE_RE.match(line):
+            close_list()
+            marker, language = fence.group(1), fence.group(2).strip()
+            body: list[str] = []
+            index += 1
+            while index < len(lines) and not lines[index].rstrip().startswith(marker):
+                body.append(lines[index])
+                index += 1
+            index += 1  # the closing fence
+
+            node: dict[str, Any] = {"type": "codeBlock", "attrs": {"language": language or None}}
+            code = "\n".join(body)
+            if code:
+                node["content"] = [{"type": "text", "text": code}]
+            content.append(node)
+            continue
+
+        # Consecutive quoted lines are one blockquote, parsed recursively so a
+        # quote may hold anything a document may hold.
+        if quote := QUOTE_RE.match(line):
+            close_list()
+            quoted = [quote.group(1)]
+            index += 1
+            while index < len(lines) and (inner := QUOTE_RE.match(lines[index].rstrip())):
+                quoted.append(inner.group(1))
+                index += 1
+
+            inner_doc = markdown_to_doc("\n".join(quoted))
+            content.append({"type": "blockquote", "content": inner_doc.get("content", [])})
+            continue
+
+        # Before the bullet rule, which would otherwise never see it — "---" has
+        # no space after the dash — but before paragraphs, which would.
+        if RULE_RE.match(line):
+            close_list()
+            content.append({"type": "horizontalRule"})
+            index += 1
+            continue
+
+        index += 1
 
         if heading := HEADING_RE.match(line):
             close_list()
@@ -116,7 +204,16 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
             close_list()
         else:
             close_list()
-            content.append(_paragraph(line))
+            # A trailing backslash continues the paragraph on a new line, so the
+            # run of continued lines is gathered into one node rather than
+            # becoming a paragraph each.
+            paragraph_lines = [line.removesuffix("\\")]
+            while line.endswith("\\") and index < len(lines):
+                line = lines[index].rstrip()
+                index += 1
+                paragraph_lines.append(line.removesuffix("\\"))
+
+            content.append(_paragraph_from_lines(paragraph_lines))
 
     close_list()
 
@@ -199,11 +296,17 @@ def doc_to_plain_text(doc: dict[str, Any]) -> str:
 # Escaped on the way out so the importer reads them back as text rather than as
 # formatting. Kept to exactly what `_unescape` reverses — the two must agree, or
 # a round trip loses characters.
-_INLINE_ESCAPES = str.maketrans({"\\": "\\\\", "*": "\\*"})
+_INLINE_ESCAPES = str.maketrans(
+    {"\\": "\\\\", "*": "\\*", "`": "\\`", "~": "\\~"}
+)
 
 # A line beginning with one of these means something to the importer, so a
 # paragraph that happens to start that way has its first character escaped.
-_LINE_STARTERS = ("#", "-")
+#
+# A single backtick is deliberately absent: it opens an inline code span, which
+# is fine at the start of a line. Only a fence — three or more — has to be
+# escaped, and that is handled separately.
+_LINE_STARTERS = ("#", "-", ">")
 
 
 def _escape_inline(text: str) -> str:
@@ -215,6 +318,9 @@ def _escape_line_start(line: str) -> str:
     for starter in _LINE_STARTERS:
         if line.startswith(starter):
             return "\\" + line
+    # Only a fence, not the inline span a single backtick opens.
+    if line.startswith("```"):
+        return "\\" + line
     # "1. " would come back as an ordered list, so the dot is escaped rather
     # than the digit — escaping a digit means nothing to Markdown.
     if NUMBERED_RE.match(line):
@@ -237,15 +343,36 @@ def _inline_to_markdown(nodes: Any) -> str:
 
     out: list[str] = []
     for node in nodes:
-        if not isinstance(node, dict) or node.get("type") != "text":
+        if not isinstance(node, dict):
             continue
 
-        text = _escape_inline(str(node.get("text", "")))
+        # Shift+Enter inside a paragraph. A trailing backslash is Markdown's
+        # unambiguous line break; two trailing spaces are invisible and get
+        # stripped by most editors on the way back in.
+        if node.get("type") == "hardBreak":
+            out.append("\\\n")
+            continue
+
+        if node.get("type") != "text":
+            continue
+
+        raw = str(node.get("text", ""))
         marks = _marks_of(node)
+
+        # Code first, and it returns: its content is literal, so escaping it
+        # would put backslashes into someone's code sample. Nothing may wrap it
+        # either — `**a**` inside backticks is not bold.
+        if "code" in marks:
+            out.append(f"`{raw}`")
+            continue
+
+        text = _escape_inline(raw)
 
         # Innermost first, so **_both_** nests rather than interleaving.
         if "italic" in marks:
             text = f"*{text}*"
+        if "strike" in marks:
+            text = f"~~{text}~~"
         if "bold" in marks:
             text = f"**{text}**"
         # Markdown cannot express underline, and the editor offers it. Dropping
@@ -256,6 +383,44 @@ def _inline_to_markdown(nodes: Any) -> str:
         out.append(text)
 
     return "".join(out)
+
+
+def _fence_for(code: str) -> str:
+    """A fence longer than any run of backticks inside the code.
+
+    Three backticks are the norm, but a sample that itself contains ``` would
+    close the block early and spill the rest into the document.
+    """
+    longest = max((len(run) for run in re.findall(r"`+", code)), default=0)
+    return "`" * max(3, longest + 1)
+
+
+def _code_block_to_markdown(block: dict[str, Any]) -> str:
+    children = block.get("content")
+    code = "".join(
+        str(child.get("text", ""))
+        for child in (children if isinstance(children, list) else [])
+        if isinstance(child, dict)
+    )
+
+    attrs = block.get("attrs")
+    language = attrs.get("language") if isinstance(attrs, dict) else None
+    fence = _fence_for(code)
+
+    return f"{fence}{language or ''}\n{code}\n{fence}"
+
+
+def _blockquote_to_markdown(block: dict[str, Any]) -> str:
+    """Render the quoted blocks, then prefix every line.
+
+    Recursive rather than paragraph-only, so a quote containing a list or a
+    heading survives instead of being flattened into one line.
+    """
+    inner = doc_to_markdown({"type": "doc", "content": block.get("content", [])})
+    if not inner:
+        return ">"
+
+    return "\n".join(f"> {line}".rstrip() for line in inner.split("\n"))
 
 
 def _list_item_text(item: Any) -> str:
@@ -303,6 +468,15 @@ def doc_to_markdown(doc: dict[str, Any]) -> str:
 
         elif kind == "paragraph":
             chunks.append(_escape_line_start(_inline_to_markdown(block.get("content"))))
+
+        elif kind == "blockquote":
+            chunks.append(_blockquote_to_markdown(block))
+
+        elif kind == "codeBlock":
+            chunks.append(_code_block_to_markdown(block))
+
+        elif kind == "horizontalRule":
+            chunks.append("---")
 
         elif kind == "bulletList":
             items = block.get("content")

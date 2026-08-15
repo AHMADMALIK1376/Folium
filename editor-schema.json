@@ -1,0 +1,39 @@
+{
+  "$comment": [
+    "Every node and mark the Folium editor's schema permits.",
+    "",
+    "This file is the contract between the editor and the Markdown converters, and",
+    "it is checked from both sides:",
+    "",
+    "  frontend/src/components/editor/editorSchema.test.ts  asserts the editor's",
+    "    real extension list produces exactly these names. Enable a new TipTap",
+    "    extension and that test fails until this file is updated.",
+    "",
+    "  backend/tests/test_editor_parity.py  asserts every name here is either",
+    "    converted by app/utils/import_file.py or listed in `excluded` below with a",
+    "    reason. Update this file and that test fails until a decision is made.",
+    "",
+    "Phase 6-i exists because that loop did not: StarterKit enabled blockquote and",
+    "codeBlock from the beginning, the converter skipped unknown blocks silently,",
+    "and a document made of a quote exported as an empty file."
+  ],
+  "nodes": [
+    "blockquote",
+    "bulletList",
+    "codeBlock",
+    "doc",
+    "hardBreak",
+    "heading",
+    "horizontalRule",
+    "listItem",
+    "orderedList",
+    "paragraph",
+    "text"
+  ],
+  "marks": ["bold", "code", "italic", "strike", "underline"],
+  "excluded": {
+    "doc": "The document root itself, not content within it.",
+    "text": "Carries the characters every other rule renders; not a block or a mark.",
+    "listItem": "Rendered by its parent bulletList or orderedList, never on its own."
+  }
+}

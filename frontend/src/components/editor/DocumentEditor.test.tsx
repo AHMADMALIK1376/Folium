@@ -9,8 +9,16 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const updateDocument = vi.fn();
+const listAttachments = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   updateDocument: (...args: unknown[]) => updateDocument(...args),
+  // The attachments panel reaches for these from the same module. Stubbed so a
+  // document with attachments enabled renders rather than throwing on an
+  // undefined import.
+  listAttachments: (...args: unknown[]) => listAttachments(...args),
+  uploadAttachment: vi.fn(),
+  attachmentUrl: vi.fn(),
+  deleteAttachment: vi.fn(),
 }));
 
 /** ProseMirror needs DOM APIs jsdom does not have, and a test driving a mocked
@@ -61,7 +69,10 @@ vi.mock("@tiptap/react", () => ({
 
 const { DocumentEditor } = await import("./DocumentEditor");
 
-function makeDocument(permission: Permission): DocumentDetail {
+function makeDocument(
+  permission: Permission,
+  attachmentsEnabled = false,
+): DocumentDetail {
   return {
     id: "doc-1",
     title: "Quarterly plan",
@@ -70,6 +81,9 @@ function makeDocument(permission: Permission): DocumentDetail {
     updated_at: "2026-01-01T00:00:00Z",
     content: { type: "doc", content: [] },
     permission,
+    // Off by default here, so these tests describe the editor rather than the
+    // attachments panel. One test below turns it on.
+    attachments_enabled: attachmentsEnabled,
     owner: {
       id: "u1",
       email: "owner@example.com",
@@ -309,5 +323,24 @@ describe("cursor identity", () => {
     // The owner of makeDocument() is "Owner"; seeing that here is the old bug.
     expect(user.name).not.toBe("Owner");
     expect(user.color).toBeTruthy();
+  });
+
+  it("omits the attachments panel when the deployment cannot store files", () => {
+    // Absent, not an empty state and not an error: a deployment without a
+    // storage key is unconfigured, not broken.
+    render(<DocumentEditor document={makeDocument("edit", false)} />);
+
+    expect(screen.queryByRole("heading", { name: /attachments/i })).not.toBeInTheDocument();
+    expect(listAttachments).not.toHaveBeenCalled();
+  });
+
+  it("shows the attachments panel when the deployment can store files", async () => {
+    listAttachments.mockResolvedValue([]);
+
+    render(<DocumentEditor document={makeDocument("edit", true)} />);
+
+    expect(
+      await screen.findByRole("heading", { name: /attachments/i }),
+    ).toBeInTheDocument();
   });
 });

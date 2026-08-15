@@ -1,6 +1,8 @@
 import { apiFetch } from "./client";
 import { ApiError } from "./errors";
 import type {
+  Attachment,
+  AttachmentUrl,
   CollabSession,
   DocumentDetail,
   GrantablePermission,
@@ -135,6 +137,49 @@ export function restoreVersion(
 export function getCollabSession(id: string): Promise<CollabSession> {
   return apiFetch<CollabSession>(`/api/v1/documents/${id}/collab`, {
     method: "POST",
+  });
+}
+
+/** What is attached to a document. Follows view permission. */
+export function listAttachments(id: string): Promise<Attachment[]> {
+  return apiFetch<Attachment[]>(`/api/v1/documents/${id}/attachments`);
+}
+
+/** Attach a file. Requires edit permission.
+ *
+ * Multipart, so no Content-Type is set here — apiFetch leaves it to the browser,
+ * which generates the boundary parameter that delimits the parts. */
+export function uploadAttachment(id: string, file: File): Promise<Attachment> {
+  const body = new FormData();
+  body.append("file", file);
+
+  return apiFetch<Attachment>(`/api/v1/documents/${id}/attachments`, {
+    method: "POST",
+    body,
+  });
+}
+
+/** A short-lived signed URL for an attachment's bytes.
+ *
+ * Fetched at the moment of download rather than held with the list: these
+ * expire, and a URL minted when the editor opened would be dead by the time
+ * someone clicked it. */
+export function attachmentUrl(
+  id: string,
+  attachmentId: string,
+): Promise<AttachmentUrl> {
+  return apiFetch<AttachmentUrl>(
+    `/api/v1/documents/${id}/attachments/${attachmentId}/url`,
+  );
+}
+
+/** Remove an attachment. Requires edit permission. */
+export function deleteAttachment(
+  id: string,
+  attachmentId: string,
+): Promise<void> {
+  return apiFetch<void>(`/api/v1/documents/${id}/attachments/${attachmentId}`, {
+    method: "DELETE",
   });
 }
 

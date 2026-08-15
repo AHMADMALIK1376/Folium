@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
+import { AttachmentsPanel } from "@/components/editor/AttachmentsPanel";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
@@ -301,6 +302,13 @@ function DocumentEditorSurface({
 
       {editor && editable && <EditorToolbar editor={editor} />}
       <EditorContent editor={editor} />
+
+      {/* Absent entirely when the deployment has no storage key, rather than an
+          empty state or an error: an unconfigured feature is not a broken one,
+          and the same is true of collaboration's indicator above. */}
+      {document.attachments_enabled && (
+        <AttachmentsPanel documentId={document.id} canEdit={editable} />
+      )}
     </div>
   );
 }

@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
+from app.config import settings
 from app.schemas.user import UserOut
 
 
@@ -96,6 +97,19 @@ class DocumentOut(DocumentSummary):
     content: dict[str, Any]
     permission: str
     owner: UserOut
+
+    @computed_field
+    @property
+    def attachments_enabled(self) -> bool:
+        """Whether this deployment can store attachments at all.
+
+        Carried on the document rather than fetched separately, for the same
+        reason CollabSession carries `enabled`: the editor is already loading
+        this payload, and what it may do with a document is part of what the
+        document is. Computed rather than assigned so that every place building
+        a DocumentOut — five of them — cannot forget it.
+        """
+        return settings.attachments_enabled
 
 
 class DocumentListOut(BaseModel):

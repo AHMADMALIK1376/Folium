@@ -103,3 +103,48 @@ test("a viewer can export a document shared with them", async ({ browser }) => {
   await ownerContext.close();
   await guestContext.close();
 });
+
+test("a quote, a code block and struck text all survive export", async ({ page }) => {
+  // The assertion that would have caught Phase 6-i's bug. The test above only
+  // ever checked "# " and "- ", so a blockquote exporting as an empty string
+  // passed it every time.
+  test.slow();
+
+  await signUp(page, uniqueEmail("rich"));
+
+  await page.getByRole("button", { name: /new document/i }).click();
+  await page.getByRole("link", { name: /untitled document/i }).click();
+  await expect(page).toHaveURL(/\/documents\//);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+
+  await page.getByRole("button", { name: /^quote$/i }).click();
+  await page.keyboard.type("A quoted line");
+  await page.getByRole("button", { name: /^quote$/i }).click();
+
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: /strikethrough/i }).click();
+  await page.keyboard.type("struck through");
+  await page.getByRole("button", { name: /strikethrough/i }).click();
+
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: /code block/i }).click();
+  await page.keyboard.type("weight = a ** b");
+
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /^export$/i }).click().then(() =>
+      page.getByRole("button", { name: /download as markdown/i }).click(),
+    ),
+  ]);
+
+  const markdown = readFileSync(await download.path(), "utf-8");
+
+  expect(markdown).toContain("> A quoted line");
+  expect(markdown).toContain("~~struck through~~");
+  expect(markdown).toContain("```");
+  // Unescaped inside the fence: a backslash there would change the code.
+  expect(markdown).toContain("weight = a ** b");
+});

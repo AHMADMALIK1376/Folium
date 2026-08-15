@@ -42,6 +42,32 @@ async def main(delete: bool) -> int:
         await engine.dispose()
 
 
+async def _remove_objects(paths: list[str]) -> None:
+    """Delete the test accounts' files from Storage.
+
+    Best effort, and deliberately not fatal. Without a service-role key
+    configured there is nothing to talk to, which is the normal state for anyone
+    who has not enabled attachments — and a bucket that cannot be reached must
+    not stop the database cleanup this script exists to do.
+    """
+    if not paths:
+        return
+
+    from app.config import settings
+
+    if not settings.attachments_enabled:
+        print(f"  (skipping {len(paths)} objects: no service-role key configured)")
+        return
+
+    from app.services import storage
+
+    try:
+        await storage.remove(paths)
+        print(f"  removed {len(paths)} objects from Storage")
+    except Exception as exc:  # noqa: BLE001 — reported, never fatal
+        print(f"  WARNING: could not remove {len(paths)} objects: {exc}")
+
+
 async def _run(delete: bool) -> int:
     async with AsyncSessionLocal() as session:
         total = (await session.execute(text("SELECT count(*) FROM users"))).scalar()
@@ -56,11 +82,28 @@ async def _run(delete: bool) -> int:
                 )
             )
         ).scalar()
+        # Rows cascade with their owner; objects in Storage do not, because the
+        # database knows nothing about the bucket. Collected before the delete,
+        # since afterwards there is nothing left to say where they were.
+        paths = list(
+            (
+                await session.execute(
+                    text(
+                        "SELECT storage_path FROM attachments WHERE document_id IN "
+                        "(SELECT id FROM documents WHERE owner_id IN "
+                        f"(SELECT id FROM users WHERE {_MATCH}))"
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
 
         keep = total - doomed
         print(f"users in database   : {total}")
         print(f"test accounts       : {doomed}")
         print(f"their documents     : {docs}")
+        print(f"their attachments   : {len(paths)}")
         print(f"real accounts kept  : {keep}")
 
         if doomed == 0:
@@ -70,6 +113,8 @@ async def _run(delete: bool) -> int:
         if not delete:
             print("\nDry run. Re-run with --yes to delete the test accounts.")
             return 0
+
+        await _remove_objects(paths)
 
         await session.execute(text(f"DELETE FROM users WHERE {_MATCH}"))
         await session.commit()

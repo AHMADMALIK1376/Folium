@@ -15,6 +15,7 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.services.collab import CollabUnavailableError
+from app.services.storage import StorageUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,21 @@ async def handle_collab_unavailable(
     return JSONResponse(
         status_code=503,
         content={"detail": "Collaboration is temporarily unavailable"},
+    )
+
+
+@app.exception_handler(StorageUnavailableError)
+async def handle_storage_unavailable(
+    request: Request, exc: StorageUnavailableError
+) -> JSONResponse:
+    # 503 for the same reason as the two above: a storage outage, or a
+    # deployment that has not configured attachments, is infrastructure. Making
+    # it a 404 would be indistinguishable from "you may not see this file",
+    # which is the one message it must never be confused with.
+    logger.warning("storage unavailable: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Attachments are temporarily unavailable"},
     )
 
 

@@ -227,7 +227,11 @@ describe("exportMarkdown", () => {
 
     const { blob } = await exportMarkdown("doc-1");
 
-    expect(blob).toBeInstanceOf(Blob);
+    // Asserted by behaviour, not with toBeInstanceOf(Blob). jsdom's Blob and the
+    // one undici hands back from response.blob() are different constructors on
+    // some Node versions, so an identity check passes locally and fails in CI
+    // for a reason that has nothing to do with this code.
+    expect(blob.type).toBe("text/markdown");
     expect(await blob.text()).toBe(markdown);
     expect(apiFetch).not.toHaveBeenCalled();
   });

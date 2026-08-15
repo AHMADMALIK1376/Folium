@@ -24,7 +24,7 @@
 
 **Interfaces:** `doc_to_markdown(doc) -> str`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 1. A heading becomes `#`, `##`, `###` by level.
 2. Paragraphs separate with a blank line.
@@ -34,7 +34,7 @@
 6. An empty document returns `""` rather than raising.
 7. Malformed input — a node that is not a dict, `content` that is not a list — returns what it can rather than raising, matching `doc_to_plain_text`'s defensiveness.
 
-- [ ] **Step 2: The round-trip test, which is the point**
+- [x] **Step 2: The round-trip test, which is the point**
 
 ```python
 def test_markdown_survives_a_round_trip():
@@ -44,11 +44,11 @@ def test_markdown_survives_a_round_trip():
 
 `SOURCE` covers everything the importer supports: both heading levels, bold, italic, a bullet list, an ordered list, and a paragraph containing an asterisk. This is the test that keeps import and export honest — a converter is exactly where quiet asymmetries live.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Walk blocks, then inline runs. Marks nest innermost-first so `**_both_**` round-trips. Escape `\\`, `` ` ``, `*`, `_`, `[`, `]`, `#` at the start of a line — but not inside a code span, of which there are none, since the editor has no code mark.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 cd D:/AJAIA/Folium/backend && .venv/Scripts/python -m pytest -q && .venv/Scripts/python -m ruff check .
@@ -65,7 +65,7 @@ cd D:/AJAIA/Folium/backend && .venv/Scripts/python -m pytest -q && .venv/Scripts
 
 **Interfaces:** `GET /api/v1/documents/{id}/export?format=markdown`
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 1. Returns 200, `text/markdown`, and a `Content-Disposition: attachment` carrying a filename.
 2. The filename derives from the title: spaces to hyphens, unsafe characters removed, `.md`.
@@ -75,13 +75,13 @@ cd D:/AJAIA/Folium/backend && .venv/Scripts/python -m pytest -q && .venv/Scripts
 6. An unrecognised `format` is 422 rather than silently returning Markdown.
 7. Unauthenticated is 401.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `format` is a `Literal["markdown"]` query parameter, so FastAPI rejects anything else with a 422 before the handler runs — no hand-written validation, and PDF is not a value because the browser makes those.
 
 Filename sanitising is its own small function so it can be tested directly: strip path separators and control characters, collapse whitespace, cap the length, and fall back when nothing usable remains.
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ---
 
@@ -92,11 +92,11 @@ Filename sanitising is its own small function so it can be tested directly: stri
 - Modify: `frontend/src/lib/api/documents.ts` and its test
 - Modify: `frontend/src/components/editor/DocumentEditor.tsx`
 
-- [ ] **Step 1: A fetcher that returns a file, with tests**
+- [x] **Step 1: A fetcher that returns a file, with tests**
 
 `exportMarkdown(id)` requests the endpoint and returns the body as a `Blob` — `apiFetch` parses JSON, so this uses it for the token and reads the response itself, or gains a small variant. Assert it does not attempt to parse Markdown as JSON.
 
-- [ ] **Step 2: Failing tests for the dialog**
+- [x] **Step 2: Failing tests for the dialog**
 
 1. Offers Markdown and PDF.
 2. Markdown triggers a download with a filename taken from the response's `Content-Disposition`, falling back to the title.
@@ -106,11 +106,11 @@ Filename sanitising is its own small function so it can be tested directly: stri
 
 Stub `window.print` and the anchor click; jsdom implements neither.
 
-- [ ] **Step 3: Implement, and wire into the header**
+- [x] **Step 3: Implement, and wire into the header**
 
 Beside History. Available whatever the permission.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ---
 
@@ -119,20 +119,25 @@ Beside History. Available whatever the permission.
 **Files:**
 - Modify: `frontend/src/app/globals.css`
 
-- [ ] **Step 1: Hide the application, keep the document**
+- [x] **Step 1: Hide the application, keep the document**
 
 Under `@media print`: hide the app header, the editor's own header row, the toolbar, both status indicators, and any open dialog. Show the document title as a heading, then the content.
 
-- [ ] **Step 2: The two details that are wrong by default**
+- [x] **Step 2: The two details that are wrong by default**
 
 - **Collaboration cursors print as stray marks** — they are absolutely positioned overlays. Hide `.collaboration-cursor__caret` and `.collaboration-cursor__label`.
 - **A long document breaks mid-heading.** `break-after: avoid` on headings and `break-inside: avoid` on list items.
 
 Also drop the editor's minimum height, which would otherwise force a mostly-blank first page, and set a white background.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Build, then check in a browser with the print preview open. A screenshot is not enough — print styles do not apply to the screen.
+
+> Verified under Chromium print emulation, reading *computed* styles, plus a real PDF rendered
+> through the print path. App header, editor header row, toolbar and both status indicators all
+> hidden; the print-only title present; editor min-height 0. The PDF is one page carrying the title,
+> heading, paragraph and both list items, and nothing else.
 
 ---
 
@@ -141,22 +146,24 @@ Build, then check in a browser with the print preview open. A screenshot is not 
 **Files:**
 - Create: `frontend/e2e/export.spec.ts`
 
-- [ ] **Step 1: Download and read the file**
+- [x] **Step 1: Download and read the file**
 
 Playwright's `waitForEvent("download")` plus `createReadStream`. Create a document with a heading and a list, export it, and assert the file's text contains `# ` and `- `. Asserting the *contents* rather than that a download happened is what makes this worth running.
 
-- [ ] **Step 2: A viewer can export**
+- [x] **Step 2: A viewer can export**
 
 Share as view, and export from the guest's browser.
 
-- [ ] **Step 3: Run everything twice, then commit**
+- [x] **Step 3: Run everything twice, then commit**
+
+> 26 passed, twice consecutively, with collaboration on.
 
 ---
 
 ### Task 6: Documentation
 
-- [ ] README: an Export section covering both formats and the fact that PDF is the browser's print dialog.
-- [ ] Ledger: archive 4-ii's, open 5-i's, and record that 5-ii is blocked on a bucket and a service-role key.
+- [x] README: an Export section covering both formats and the fact that PDF is the browser's print dialog.
+- [x] Ledger: archive 4-ii's, open 5-i's, and record that 5-ii is blocked on a bucket and a service-role key.
 
 ---
 

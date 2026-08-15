@@ -36,12 +36,19 @@ Set up Supabase first — both other services need its credentials.
 2. From **Project Settings → API**, record:
    - Project URL
    - `anon` public key — safe for the browser
-   - `service_role` key — **not needed by Folium's backend; do not copy it anywhere, and never expose
-     it to the frontend**
+   - `service_role` key — **only if you want attachments.** It bypasses row-level security, so treat
+     it as a database password: backend only, never `NEXT_PUBLIC_*`, never committed. Skip it and
+     attachments are simply off; everything else works unchanged.
 3. From **Project Settings → Database**, record the connection string for Alembic and SQLAlchemy.
 4. Under **Authentication → Providers**, enable email/password and any OAuth providers you want.
 5. Under **Authentication → URL Configuration**, add your frontend URLs (local and production) as
    redirect URLs.
+6. For attachments, create the storage bucket once — a script rather than a migration, because CI
+   runs a plain PostgreSQL with no `storage` schema:
+
+   ```bash
+   cd backend && python scripts/create_storage_bucket.py
+   ```
 
 ### 2. Backend (Render)
 
@@ -60,9 +67,23 @@ Set up Supabase first — both other services need its credentials.
    ENVIRONMENT=production
    ```
 
-   `SUPABASE_SERVICE_ROLE_KEY` is deliberately absent. The backend only verifies tokens against
-   Supabase's public keys and never calls the admin API, so it has no need for a credential that could
-   mint tokens or bypass access control. Do not add it.
+   Optional, and each blank means the feature is off rather than broken:
+
+   ```
+   Y_SWEET_CONNECTION_STRING=<y-sweet connection string>   # live collaboration
+   SUPABASE_SERVICE_ROLE_KEY=<service_role key>            # attachments
+   ```
+
+   **On the service-role key.** It bypasses row-level security and is the most dangerous value in
+   the deployment, so it is worth being explicit about why it is here. Attachments are stored in a
+   private bucket, and the backend is the only thing that touches it: it checks permission with the
+   same rules as every other route, then uploads, or mints a short-lived signed URL for a download.
+   The alternative — letting the browser reach Storage directly under RLS policies — needs no key,
+   but it restates Folium's ownership-and-shares model in SQL, and two implementations of one
+   permission model drift.
+
+   Set it on the backend only. It must never appear as a `NEXT_PUBLIC_*` variable, which ships to
+   the browser by definition.
 
 5. Run migrations once the service is up: `alembic upgrade head`.
 

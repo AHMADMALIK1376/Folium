@@ -73,6 +73,30 @@ export interface DocumentDetail extends DocumentSummary {
   content: TipTapDoc;
   permission: Permission;
   owner: UserProfile;
+  /** False when the deployment has no Supabase service-role key configured — a
+   *  supported state, not a failure, exactly as CollabSession.enabled is. The
+   *  editor then omits the attachments panel rather than offering a control
+   *  that would 503. */
+  attachments_enabled: boolean;
+}
+
+/** A file attached to a document.
+ *
+ * Deliberately without a storage path: that is an address inside a private
+ * bucket, and the browser reaches the bytes through a short-lived signed URL
+ * from `GET .../attachments/{id}/url` instead. */
+export interface Attachment {
+  id: string;
+  document_id: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+export interface AttachmentUrl {
+  url: string;
+  expires_in: number;
 }
 
 /** What a client needs to join a document's collaboration room.

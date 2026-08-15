@@ -63,3 +63,40 @@ def test_a_single_origin_still_works():
     # The permissive default is development-only: one explicit value replaces it
     # entirely, so a deployment never inherits a localhost origin.
     assert s.cors_origins == ["https://folium.app"]
+
+
+def test_attachments_are_off_without_a_service_role_key():
+    """Blank means off, exactly as a blank y-sweet string means off.
+
+    CI holds no Supabase credentials, so a feature that could not be disabled
+    would be a feature nobody else could run the suite against.
+    """
+    s = Settings(_env_file=None, supabase_url="https://abc.supabase.co")
+    assert s.attachments_enabled is False
+
+
+def test_attachments_need_a_project_as_well_as_a_key():
+    """A key with nowhere to send it is not a working configuration."""
+    assert (
+        Settings(
+            _env_file=None, supabase_url="", supabase_service_role_key="service-key"
+        ).attachments_enabled
+        is False
+    )
+
+
+def test_attachments_are_on_when_both_are_present():
+    s = Settings(
+        _env_file=None,
+        supabase_url="https://abc.supabase.co",
+        supabase_service_role_key="service-key",
+    )
+    assert s.attachments_enabled is True
+    assert s.storage_url == "https://abc.supabase.co/storage/v1"
+
+
+def test_whitespace_is_not_a_service_role_key():
+    s = Settings(
+        _env_file=None, supabase_url="https://abc.supabase.co", supabase_service_role_key="   "
+    )
+    assert s.attachments_enabled is False

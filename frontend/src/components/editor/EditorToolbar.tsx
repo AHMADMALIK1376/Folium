@@ -44,9 +44,24 @@ function ToolbarButton({
   );
 }
 
-/** The marks v1 supported, which are also the ones the .md import converter
- *  produces. Anything beyond them (links, tables, code blocks) would import as
- *  nothing, so the toolbar deliberately stops here. */
+function Divider() {
+  return <span aria-hidden="true" className="mx-1 h-5 w-px bg-neutral-200" />;
+}
+
+/** Every type the editor's schema permits, and no more.
+ *
+ * This list used to stop at the marks the Markdown converter understood, on the
+ * reasoning that offering more would export as nothing. The reasoning was sound
+ * and the conclusion was wrong: `StarterKit` enables blockquote, code blocks,
+ * inline code, strikethrough, rules and hard breaks regardless of what the
+ * toolbar shows, reachable by shortcut, by input rule (`> `, ` ``` `, `---`) and
+ * by paste. Leaving them out of the toolbar hid them from the person writing,
+ * not from the document — and export dropped them in silence.
+ *
+ * So the rule is now the opposite one: what the schema allows, the toolbar
+ * shows and the converter carries. `editor-schema.json` holds that contract and
+ * both sides are tested against it.
+ */
 export function EditorToolbar({ editor }: { editor: Editor }) {
   return (
     <div
@@ -75,8 +90,22 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       >
         <span className="underline">U</span>
       </ToolbarButton>
+      <ToolbarButton
+        label="Strikethrough"
+        active={editor.isActive("strike")}
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+      >
+        <span className="line-through">S</span>
+      </ToolbarButton>
+      <ToolbarButton
+        label="Inline code"
+        active={editor.isActive("code")}
+        onClick={() => editor.chain().focus().toggleCode().run()}
+      >
+        <span className="font-mono text-xs">&lt;&gt;</span>
+      </ToolbarButton>
 
-      <span aria-hidden="true" className="mx-1 h-5 w-px bg-neutral-200" />
+      <Divider />
 
       <ToolbarButton
         label="Heading 1"
@@ -100,7 +129,33 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
         ¶
       </ToolbarButton>
 
-      <span aria-hidden="true" className="mx-1 h-5 w-px bg-neutral-200" />
+      <Divider />
+
+      <ToolbarButton
+        label="Quote"
+        active={editor.isActive("blockquote")}
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+      >
+        &rdquo;
+      </ToolbarButton>
+      <ToolbarButton
+        label="Code block"
+        active={editor.isActive("codeBlock")}
+        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+      >
+        <span className="font-mono text-xs">{"{ }"}</span>
+      </ToolbarButton>
+      <ToolbarButton
+        // Not a toggle: a rule is inserted at the caret and has no active
+        // state, so aria-pressed stays false rather than lying.
+        label="Divider"
+        active={false}
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+      >
+        &mdash;
+      </ToolbarButton>
+
+      <Divider />
 
       <ToolbarButton
         label="Bulleted list"

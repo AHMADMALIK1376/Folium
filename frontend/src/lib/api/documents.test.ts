@@ -22,6 +22,10 @@ const {
   getVersion,
   restoreVersion,
   exportMarkdown,
+  listAttachments,
+  uploadAttachment,
+  attachmentUrl,
+  deleteAttachment,
 } = await import("./documents");
 
 const content: TipTapDoc = {
@@ -181,6 +185,70 @@ describe("importDocument", () => {
 
     const [, init] = apiFetch.mock.calls[0];
     expect(init.headers).toBeUndefined();
+  });
+});
+
+describe("attachment fetchers", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists what is attached", async () => {
+    apiFetch.mockResolvedValue([]);
+
+    await listAttachments("doc-1");
+
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/documents/doc-1/attachments");
+  });
+
+  it("posts the file as multipart under the field name the backend expects", async () => {
+    apiFetch.mockResolvedValue({ id: "att-1" });
+    const file = new File(["bytes"], "photo.png", { type: "image/png" });
+
+    await uploadAttachment("doc-1", file);
+
+    const [path, init] = apiFetch.mock.calls[0];
+    expect(path).toBe("/api/v1/documents/doc-1/attachments");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    // "file" is the name of the backend's File() parameter; anything else is a 422.
+    expect((init.body as FormData).get("file")).toBe(file);
+  });
+
+  it("sets no content type of its own, leaving the boundary to the browser", async () => {
+    apiFetch.mockResolvedValue({ id: "att-1" });
+
+    await uploadAttachment("doc-1", new File(["x"], "a.png", { type: "image/png" }));
+
+    expect(apiFetch.mock.calls[0][1].headers).toBeUndefined();
+  });
+
+  it("asks for a download URL per download, not per list", async () => {
+    // Signed URLs expire. One minted when the editor opened would be dead by
+    // the time anyone clicked it.
+    apiFetch.mockResolvedValue({ url: "https://storage.test/x", expires_in: 300 });
+
+    await attachmentUrl("doc-1", "att-1");
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      "/api/v1/documents/doc-1/attachments/att-1/url",
+    );
+  });
+
+  it("deletes an attachment", async () => {
+    apiFetch.mockResolvedValue(null);
+
+    await deleteAttachment("doc-1", "att-1");
+
+    const [path, init] = apiFetch.mock.calls[0];
+    expect(path).toBe("/api/v1/documents/doc-1/attachments/att-1");
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("propagates a 503 rather than swallowing it", async () => {
+    // 503 means the deployment has no key, or storage is down. The caller
+    // decides what to show; it is not an empty list.
+    apiFetch.mockRejectedValue(new ApiError(503, "Attachments are temporarily unavailable"));
+
+    await expect(listAttachments("doc-1")).rejects.toMatchObject({ status: 503 });
   });
 });
 

@@ -6,6 +6,11 @@ import type { TipTapDoc } from "./types";
 const apiFetch = vi.fn();
 vi.mock("./client", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...args) }));
 
+const getSession = vi.fn();
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({ auth: { getSession } }),
+}));
+
 const {
   updateDocument,
   listShares,
@@ -16,6 +21,7 @@ const {
   listVersions,
   getVersion,
   restoreVersion,
+  exportMarkdown,
 } = await import("./documents");
 
 const content: TipTapDoc = {
@@ -175,5 +181,127 @@ describe("importDocument", () => {
 
     const [, init] = apiFetch.mock.calls[0];
     expect(init.headers).toBeUndefined();
+  });
+});
+
+describe("exportMarkdown", () => {
+  const markdown = "# Quarterly plan\n\n- An item";
+
+  function response(init: ResponseInit = {}) {
+    return new Response(markdown, {
+      status: 200,
+      headers: { "Content-Type": "text/markdown" },
+      ...init,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getSession.mockResolvedValue({
+      data: { session: { access_token: "token-abc" } },
+    });
+    process.env.NEXT_PUBLIC_API_URL = "http://api.test";
+  });
+
+  it("requests the export endpoint with the bearer token", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({
+        headers: { "Content-Disposition": 'attachment; filename="a.md"' },
+      }),
+    );
+
+    await exportMarkdown("doc-1");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://api.test/api/v1/documents/doc-1/export?format=markdown");
+    expect((init?.headers as Record<string, string>).Authorization).toBe(
+      "Bearer token-abc",
+    );
+  });
+
+  it("returns the body as a blob without parsing it as JSON", async () => {
+    // The point of not going through apiFetch, which calls response.json() on
+    // every success. Markdown is not JSON, so routing this through it would
+    // throw on a response that is perfectly correct.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response());
+
+    const { blob } = await exportMarkdown("doc-1");
+
+    expect(blob).toBeInstanceOf(Blob);
+    expect(await blob.text()).toBe(markdown);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("takes the filename from the header the server sent", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({
+        headers: {
+          "Content-Disposition": 'attachment; filename="Quarterly-plan.md"',
+        },
+      }),
+    );
+
+    const { filename } = await exportMarkdown("doc-1");
+
+    // The server derived and sanitised it; inventing one here would risk a
+    // different — and possibly invalid — answer.
+    expect(filename).toBe("Quarterly-plan.md");
+  });
+
+  it("falls back to a usable name when the header is missing", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(response());
+
+    const { filename } = await exportMarkdown("doc-1");
+
+    expect(filename).toBe("document.md");
+  });
+
+  it("prefers the UTF-8 name so a non-Latin title is not lost", async () => {
+    // Nothing of these titles survives the ASCII fallback, so reading that one
+    // first would save every such document as "document.md".
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({
+        headers: {
+          "Content-Disposition":
+            "attachment; filename=\"document.md\"; filename*=UTF-8''%E5%AD%A3%E5%BA%A6%E8%AE%A1%E5%88%92.md",
+        },
+      }),
+    );
+
+    const { filename } = await exportMarkdown("doc-1");
+
+    expect(filename).toBe("季度计划.md");
+  });
+
+  it("uses the ASCII name when the encoded one is malformed", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      response({
+        headers: {
+          "Content-Disposition":
+            "attachment; filename=\"Quarterly-plan.md\"; filename*=UTF-8''%E5%AD",
+        },
+      }),
+    );
+
+    const { filename } = await exportMarkdown("doc-1");
+
+    expect(filename).toBe("Quarterly-plan.md");
+  });
+
+  it("raises an ApiError carrying the status", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("Not Found", { status: 404, statusText: "Not Found" }),
+    );
+
+    await expect(exportMarkdown("doc-1")).rejects.toBeInstanceOf(ApiError);
+    await expect(exportMarkdown("doc-1")).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("refuses to call the API without a session", async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    await expect(exportMarkdown("doc-1")).rejects.toBeInstanceOf(ApiError);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

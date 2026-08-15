@@ -11,7 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
+import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
+import { ExportDialog } from "@/components/editor/ExportDialog";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
@@ -19,6 +21,7 @@ import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
 // Aliased: TipTap's Collaboration extension already owns that name here.
 import type { Collaboration as CollaborationState } from "@/lib/collab/useCollaboration";
 import { cursorColor } from "@/lib/collab/color";
+import { decideOnSync } from "@/lib/collab/reconcile";
 import { useCollaboration } from "@/lib/collab/useCollaboration";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 
@@ -82,9 +85,12 @@ function DocumentEditorSurface({
             Collaboration.configure({ document: collab.doc }),
             CollaborationCursor.configure({
               provider: collab.provider,
+              // The signed-in user, not the document's owner. Labelling every
+              // caret with the owner meant that on a shared document everyone
+              // appeared as the person who created it.
               user: {
-                name: document.owner.display_name || "Someone",
-                color: cursorColor(document.owner_id),
+                name: collab.user?.display_name || "Someone",
+                color: cursorColor(collab.user?.id ?? ""),
               },
             }),
           ]
@@ -147,22 +153,36 @@ function DocumentEditorSurface({
   useEffect(() => {
     if (!collab.enabled || !collab.provider || !editor || !editable) return;
 
-    // Seed a room that has never held this document — but only after the
-    // provider says it has synced.
+    // Reconcile the room and the database — but only after the provider says it
+    // has synced.
     //
     // This is the trap the whole feature turns on. Before sync, every client's
     // Y.Doc is empty, so seeding on mount means each one inserts the document
     // and the text appears two or three times. After sync, "empty" means
     // genuinely empty: nobody has ever opened this document collaboratively,
     // and the copy in Postgres is the one to start from.
-    const seedIfEmpty = (synced: boolean) => {
-      if (!synced || !editor.isEmpty) return;
-      editor.commands.setContent(document.content as JSONContent);
+    const reconcile = (synced: boolean) => {
+      if (!synced) return;
+
+      const roomContent = editor.getJSON() as TipTapDoc;
+      switch (decideOnSync(editor.isEmpty, roomContent, document.content)) {
+        case "seed":
+          editor.commands.setContent(document.content as JSONContent);
+          break;
+        case "save":
+          // The room is ahead of the database — everyone left before autosave
+          // fired. Through the normal save path, so Phase 3 snapshots it like
+          // any other edit rather than smuggling content past version history.
+          schedule({ content: roomContent });
+          break;
+        case "none":
+          break;
+      }
     };
 
-    collab.provider.on("synced", seedIfEmpty);
-    return () => collab.provider?.off("synced", seedIfEmpty);
-  }, [collab.enabled, collab.provider, editor, editable, document.content]);
+    collab.provider.on("synced", reconcile);
+    return () => collab.provider?.off("synced", reconcile);
+  }, [collab.enabled, collab.provider, editor, editable, document.content, schedule]);
 
   useEffect(() => {
     if (!editable) return;
@@ -195,7 +215,10 @@ function DocumentEditorSurface({
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white">
-      <div className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-3">
+      <div
+        data-print-hide
+        className="flex flex-wrap items-center gap-3 border-b border-neutral-200 px-4 py-3"
+      >
         <Link
           href="/dashboard"
           // Not prefetched, deliberately. A prefetch of the dashboard happens
@@ -224,6 +247,13 @@ function DocumentEditorSurface({
         )}
 
         {editable && <SaveStatus status={status} />}
+
+        {/* Only when there is a room to be connected to. With collaboration off
+            there is nothing to report, and an indicator would imply otherwise. */}
+        {collab.enabled && <ConnectionStatus status={collab.status} />}
+
+        {/* Offered whatever the permission: exporting is reading. */}
+        <ExportDialog documentId={document.id} />
 
         <HistoryDialog
           documentId={document.id}
@@ -262,6 +292,12 @@ function DocumentEditorSurface({
           />
         </div>
       )}
+
+      {/* Screen shows the title in the header above; print hides that whole row,
+          so the printed page needs a heading of its own. */}
+      <h1 className="hidden px-6 pt-6 text-2xl font-semibold text-neutral-900 print:block">
+        {title}
+      </h1>
 
       {editor && editable && <EditorToolbar editor={editor} />}
       <EditorContent editor={editor} />

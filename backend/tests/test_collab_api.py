@@ -193,3 +193,44 @@ async def test_the_endpoint_requires_authentication(client: AsyncClient, alice_e
     doc_id = await make_doc(client, alice_email)
 
     assert (await client.post(f"/api/v1/documents/{doc_id}/collab")).status_code == 401
+
+
+async def test_the_session_identifies_the_caller_not_the_owner(
+    client: AsyncClient, alice_email, bob_email, configured, minted
+):
+    """The editor labels cursors from this.
+
+    Phase 4-i labelled every caret with the document owner's name, because the
+    owner's profile was the only one the editor had. Asserted with a
+    collaborator rather than the owner, so returning the owner still fails.
+    """
+    await ensure_user(client, bob_email)
+    doc_id = await make_doc(client, alice_email)
+    await client.post(
+        f"/api/v1/documents/{doc_id}/shares",
+        json={"email": bob_email, "permission": "edit"},
+        headers=auth_headers(alice_email),
+    )
+
+    response = await client.post(
+        f"/api/v1/documents/{doc_id}/collab", headers=auth_headers(bob_email)
+    )
+
+    assert response.status_code == 200
+    user = response.json()["user"]
+    assert user["email"] == bob_email
+    assert user["display_name"]
+
+
+async def test_the_caller_is_reported_even_when_collaboration_is_off(
+    client: AsyncClient, alice_email, monkeypatch
+):
+    """The response shape stays constant, so a client never has to branch."""
+    monkeypatch.setattr(settings, "y_sweet_connection_string", "")
+    doc_id = await make_doc(client, alice_email)
+
+    response = await client.post(
+        f"/api/v1/documents/{doc_id}/collab", headers=auth_headers(alice_email)
+    )
+
+    assert response.json()["user"]["email"] == alice_email

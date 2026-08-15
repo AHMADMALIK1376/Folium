@@ -80,6 +80,12 @@ export interface DocumentDetail extends DocumentSummary {
  * `enabled` is false when the deployment has no y-sweet configured — a
  * supported state, not a failure. The editor then behaves exactly as it did
  * before Phase 4: local editing with autosave. */
+export interface CollabUser {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
 export interface CollabSession {
   enabled: boolean;
   url: string | null;
@@ -87,4 +93,7 @@ export interface CollabSession {
   doc_id: string | null;
   token: string | null;
   permission: Permission;
+  /** The caller — whoever is signed in — not the document's owner. Cursor
+   *  labels come from here. */
+  user: CollabUser;
 }

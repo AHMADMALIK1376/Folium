@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@/lib/api/errors";
@@ -9,7 +9,13 @@ vi.mock("@/lib/api/documents", () => ({
 }));
 
 const destroy = vi.fn();
-const createYjsProvider = vi.fn((..._args: unknown[]) => ({ destroy }));
+const off = vi.fn();
+/** Captures the status listener so a test can drive the provider's events. */
+let statusListener: ((event: unknown) => void) | null = null;
+const on = vi.fn((event: string, listener: (e: unknown) => void) => {
+  if (event === "connection-status") statusListener = listener;
+});
+const createYjsProvider = vi.fn((..._args: unknown[]) => ({ destroy, on, off }));
 vi.mock("@y-sweet/client", () => ({
   createYjsProvider: (...a: unknown[]) => createYjsProvider(...a),
 }));
@@ -24,12 +30,16 @@ function session(overrides = {}) {
     doc_id: "folium-doc-1",
     token: "a-room-token",
     permission: "owner",
+    user: { id: "u2", email: "guest@example.com", display_name: "Guest Chen" },
     ...overrides,
   };
 }
 
 describe("useCollaboration", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    statusListener = null;
+  });
 
   it("connects when the backend reports a room", async () => {
     getCollabSession.mockResolvedValue(session());
@@ -102,5 +112,59 @@ describe("useCollaboration", () => {
 
     // Otherwise every navigation between documents leaks a websocket.
     expect(destroy).toHaveBeenCalled();
+  });
+
+  it("starts out saying it is connecting, not connected", async () => {
+    getCollabSession.mockResolvedValue(session());
+
+    const { result } = renderHook(() => useCollaboration("doc-1"));
+
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+    // Claiming "Live" before the socket is up would be a lie for the second or
+    // two it takes, and that is exactly when a user looks.
+    expect(result.current.status).toBe("connecting");
+  });
+
+  it("follows the provider's connection status", async () => {
+    getCollabSession.mockResolvedValue(session());
+
+    const { result } = renderHook(() => useCollaboration("doc-1"));
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+
+    act(() => statusListener?.({ status: "connected" }));
+    await waitFor(() => expect(result.current.status).toBe("connected"));
+
+    act(() => statusListener?.({ status: "offline" }));
+    await waitFor(() => expect(result.current.status).toBe("offline"));
+  });
+
+  it("treats handshaking as still connecting", async () => {
+    // The provider distinguishes them; a person waiting does not.
+    getCollabSession.mockResolvedValue(session());
+
+    const { result } = renderHook(() => useCollaboration("doc-1"));
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+
+    act(() => statusListener?.({ status: "handshaking" }));
+    await waitFor(() => expect(result.current.status).toBe("connecting"));
+  });
+
+  it("reports the signed-in user for the cursor label", async () => {
+    getCollabSession.mockResolvedValue(session());
+
+    const { result } = renderHook(() => useCollaboration("doc-1"));
+
+    await waitFor(() => expect(result.current.user?.display_name).toBe("Guest Chen"));
+  });
+
+  it("stops listening for status changes on unmount", async () => {
+    getCollabSession.mockResolvedValue(session());
+
+    const { result, unmount } = renderHook(() => useCollaboration("doc-1"));
+    await waitFor(() => expect(result.current.enabled).toBe(true));
+
+    unmount();
+
+    expect(off).toHaveBeenCalledWith("connection-status", expect.any(Function));
   });
 });

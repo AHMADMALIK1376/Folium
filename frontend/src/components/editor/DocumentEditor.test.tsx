@@ -23,6 +23,7 @@ const collabState = {
   doc: null as unknown,
   loading: false,
   canWrite: false,
+  user: null as unknown,
 };
 vi.mock("@/lib/collab/useCollaboration", () => ({
   useCollaboration: () => collabState,
@@ -104,7 +105,9 @@ describe("DocumentEditor", () => {
     expect(screen.queryByRole("button", { name: /bold/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: /document title/i })).not.toBeInTheDocument();
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
-    expect(screen.getByText(/quarterly plan/i)).toBeInTheDocument();
+    // Two copies of the title exist: the one on screen, and a print-only
+    // heading, because printing hides the whole header row.
+    expect(screen.getAllByText(/quarterly plan/i).length).toBeGreaterThan(0);
   });
 
   it("treats comment permission as read-only this phase", () => {
@@ -204,6 +207,7 @@ describe("DocumentEditor with collaboration", () => {
       doc: null,
       loading: false,
       canWrite: false,
+      user: null,
     });
   });
 
@@ -273,5 +277,37 @@ describe("DocumentEditor with collaboration", () => {
     render(<DocumentEditor document={makeDocument("view")} />);
 
     expect(on).not.toHaveBeenCalled();
+  });
+});
+
+describe("cursor identity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editorOptions = {};
+  });
+
+  it("labels the caret with the signed-in user, not the document owner", () => {
+    // The bug this replaces: the editor only had the document's owner to hand,
+    // so on a shared document every participant's cursor carried the owner's
+    // name. Deliberately tested with a collaborator on someone else's document.
+    Object.assign(collabState, {
+      enabled: true,
+      doc: {},
+      provider: { on: vi.fn(), off: vi.fn() },
+      canWrite: true,
+      loading: false,
+      user: { id: "u2", email: "guest@example.com", display_name: "Guest Chen" },
+    });
+
+    render(<DocumentEditor document={makeDocument("edit")} />);
+
+    const cursor = (editorOptions.extensions as { name?: string; options?: Record<string, unknown> }[])
+      .find((extension) => extension?.name === "collaborationCursor");
+    const user = cursor?.options?.user as { name: string; color: string };
+
+    expect(user.name).toBe("Guest Chen");
+    // The owner of makeDocument() is "Owner"; seeing that here is the old bug.
+    expect(user.name).not.toBe("Owner");
+    expect(user.color).toBeTruthy();
   });
 });

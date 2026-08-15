@@ -3,15 +3,16 @@
 A collaborative document editor — create, format, and edit rich-text documents in the browser, and
 share them with other people.
 
-> **Status: the rebuild is complete through Phase 4-i. There is no v1 code left.**
+> **Status: the rebuild is complete through Phase 5-i. There is no v1 code left.**
 > Folium began as a timeboxed interview assignment and has been rebuilt as a real product: a Next.js
 > frontend and a FastAPI backend on PostgreSQL, with real authentication through Supabase, documents
 > stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
-> import, version history with restore, and live collaborative editing.
+> import and export, version history with restore, and live collaborative editing.
 >
-> **Still to come:** offline editing and reconnection polish. Live collaboration works when a
-> y-sweet server is configured; without one the editor falls back to single-user autosave, and two
-> people editing at once overwrite each other — which is what version history exists to rescue.
+> **Still to come:** attachments, which need a storage bucket and a service-role key. Live
+> collaboration works when a y-sweet server is configured; without one the editor falls back to
+> single-user autosave, and two people editing at once overwrite each other — which is what version
+> history exists to rescue.
 
 ---
 
@@ -27,7 +28,9 @@ share them with other people.
 | [2C-iii](docs/superpowers/plans/2026-07-30-phase-2c-iii-sharing-import.md) | Sharing with permission levels, file import, and deleting all v1 code | Done |
 | [3](docs/superpowers/plans/2026-08-01-phase-3-version-history.md) | Version history: snapshots as you edit, preview, and restore | Done |
 | [4-i](docs/superpowers/plans/2026-08-01-phase-4-i-live-collaboration.md) | Live collaboration: shared editing with cursors, over y-sweet | Done |
-| 4-ii | Reconnection, offline behaviour, and server-side reconciliation | Next |
+| [4-ii](docs/superpowers/plans/2026-08-01-phase-4-ii-collaboration-durability.md) | Cursor identity, a connection indicator, and repairing stale documents | Done |
+| [5-i](docs/superpowers/plans/2026-08-01-phase-5-i-export.md) | Export: download as Markdown, or print as a PDF | Done |
+| 5-ii | Attachments, stored in Supabase Storage | Blocked on a bucket and a service-role key |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -52,6 +55,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Create, rename, and edit rich-text documents — bold, italic, underline, headings, and
   bulleted/numbered lists — with autosave.
 - Import a `.txt` or `.md` file as a new document.
+- Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Share a document by email with view or edit access, change someone's level, or revoke it. The
   dashboard separates documents you own from documents shared with you.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
@@ -130,6 +134,35 @@ rejection and enforced by the backend, which does the conversion.
   `**bold**`, `*italic*`, and `-`/numbered lists. It is **not** a full CommonMark parser — no tables,
   code blocks, links, or nested lists.
 
+## Export
+
+The other half of the import door: **Export** in the editor header offers two formats, and is
+available to anyone who can open the document, viewers included — exporting is reading.
+
+**Markdown** downloads a `.md` file converted by the backend. The converter is the exact inverse of
+the importer above and lives beside it, so exporting a document and re-importing it reproduces the
+original — a round-trip test enforces that, because a converter is where quiet asymmetries live.
+Two details are deliberate:
+
+- Markdown has no underline and the editor has one, so an underlined run is emitted as `<u>text</u>`
+  rather than being silently dropped.
+- Markdown's own characters are escaped in text, so a paragraph mentioning `*` survives instead of
+  turning into emphasis.
+
+The filename comes from the title — spaces to hyphens, characters a filesystem would refuse removed.
+A title made only of symbols falls back to `document.md` rather than producing a file called `.md`,
+which browsers refuse to save.
+
+**PDF** is your browser's print dialog, where every current OS offers *Save as PDF*. There is no PDF
+library on either side. The cost is that the browser chooses the filename and output varies slightly
+between browsers; what it buys is nothing added to the deployment — server-side rendering would mean
+GTK system libraries for a feature most people use rarely — and output that matches what you are
+looking at, because it *is* what you are looking at. A print stylesheet does the real work: the app
+header, toolbar, status indicators, dialogs, and collaboration cursors all disappear, leaving the
+title and the document on a white page that breaks between blocks rather than through a heading.
+
+Exporting a specific version from history is not supported; history restores in place instead.
+
 ## Live collaboration
 
 Optional, and off unless the backend has `Y_SWEET_CONNECTION_STRING` set. With it, two people editing
@@ -137,8 +170,16 @@ one document see each other's text and cursors as they type; without it, the edi
 it does alone. A viewer receives a **read-only room token**, so the server itself refuses their writes
 rather than trusting the browser.
 
+Each person's caret carries their own name and a colour derived from their user id, so they are the
+same colour to everyone and after a reload. The editor also says whether it is **Live**, connecting,
+or offline — separately from the save indicator, because "my work is in the database" and "other
+people can see it" are different questions that fail independently.
+
 Postgres stays the record of truth: the client that made a change still saves the merged document
-through the API, so version history, the dashboard, and everything else are unaffected.
+through the API, so version history, the dashboard, and everything else are unaffected. If everyone
+closes their browser before autosave fires, the merged text lives only in the room — so when a client
+next syncs and finds the room ahead of the database, it writes it back. The next person to open the
+document repairs the record.
 
 To run one locally, in a third terminal:
 
@@ -208,11 +249,17 @@ DEPLOY.md               deployment guide
 
 - **Real-time collaboration needs a y-sweet server.** Without one the editor still works, but two
   people editing at once overwrite each other — recoverable from version history, not prevented.
-- **No offline editing.** Losing the connection mid-session is Phase 4-ii.
+- **Offline edits are held but unannounced.** Yjs keeps what you type while disconnected and merges it
+  on reconnect, and the editor says it is offline — but nothing tells you that those particular edits
+  have not yet reached anyone else.
 - **Version history is automatic, not manual.** A snapshot is kept at most every five minutes per
   author, and only the newest 50 per document, so the very last keystrokes before a mistake may not
   have their own version.
-- **Markdown import is minimal** — headings, bold, italic, and lists only.
+- **Markdown import and export are minimal** — headings, bold, italic, underline, and lists only.
+  The two match deliberately, so a round trip is lossless; anything outside that set is not supported
+  in either direction.
+- **PDF export is the browser's print dialog**, so the browser chooses the filename and the output
+  varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
   that has not signed up fails rather than waiting for them.
 - **No comments**, though the permission model already carries a `comment` level for them.

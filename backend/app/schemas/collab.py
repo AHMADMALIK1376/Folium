@@ -1,4 +1,19 @@
+import uuid
+
 from pydantic import BaseModel
+
+
+class CollabUser(BaseModel):
+    """Who is joining, so the editor can label their cursor.
+
+    The caller's own profile, not the document owner's. Phase 4-i had only the
+    owner to hand and labelled every caret with it, so everyone in a shared
+    document appeared under the owner's name.
+    """
+
+    id: uuid.UUID
+    email: str
+    display_name: str
 
 
 class CollabSession(BaseModel):
@@ -21,3 +36,6 @@ class CollabSession(BaseModel):
     # shared document. Advisory only — content reaches the database through
     # PATCH, which enforces this properly.
     permission: str
+    # Present whether or not collaboration is enabled: a constant shape means a
+    # client never has to branch to find out who it is.
+    user: CollabUser

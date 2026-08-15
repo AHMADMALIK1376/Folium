@@ -36,7 +36,7 @@ test("typing is still there after a reload", async ({ page }) => {
   await page.getByRole("textbox", { name: /document body/i }).click();
   await page.keyboard.type(sentence);
 
-  await expect(page.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
   await page.reload();
   await expect(page.getByText(sentence)).toBeVisible();
@@ -50,7 +50,7 @@ test("formatting survives the round trip", async ({ page }) => {
   await page.getByRole("button", { name: /heading 1/i }).click();
   await page.keyboard.type("A heading");
 
-  await expect(page.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
   await page.reload();
   // Not just the text: an h1 specifically, which means the node type survived
@@ -80,7 +80,7 @@ test("renaming in the editor shows up on the dashboard", async ({ page }) => {
     ),
     titleInput.fill(title),
   ]);
-  await expect(page.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
   await page.getByRole("link", { name: /documents/i }).first().click();
   await expect(page).toHaveURL(/\/dashboard/);
@@ -98,7 +98,7 @@ test("a burst of typing settles on saved rather than sticking on unsaved", async
   // the status lands, not how many requests went out.
   await page.keyboard.type("The quick brown fox jumps over the lazy dog", { delay: 15 });
 
-  await expect(page.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
   await page.reload();
   await expect(page.getByText(/the quick brown fox/i)).toBeVisible();
 });

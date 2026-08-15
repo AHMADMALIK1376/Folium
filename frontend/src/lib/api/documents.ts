@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { ApiError } from "./errors";
 import type {
   CollabSession,
   DocumentDetail,
@@ -135,4 +136,57 @@ export function getCollabSession(id: string): Promise<CollabSession> {
   return apiFetch<CollabSession>(`/api/v1/documents/${id}/collab`, {
     method: "POST",
   });
+}
+
+/** Download a document as Markdown.
+ *
+ * Does not go through apiFetch, which parses every response as JSON — this one
+ * is a file. It repeats only the token read, and returns the body together with
+ * the filename the server chose, so the browser saves it under the document's
+ * own name rather than something invented here.
+ */
+export async function exportMarkdown(
+  id: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const { createClient } = await import("@/lib/supabase/client");
+  const {
+    data: { session },
+  } = await createClient().auth.getSession();
+
+  if (!session) throw new ApiError(0, "Not signed in");
+
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+  const response = await fetch(`${base}/api/v1/documents/${id}/export?format=markdown`, {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  if (!response.ok) {
+    throw new ApiError(response.status, response.statusText);
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: filenameFrom(response.headers.get("Content-Disposition")),
+  };
+}
+
+/** Pull the filename out of a Content-Disposition header.
+ *
+ * The server sends it twice, as RFC 6266 requires: `filename*` in UTF-8, and a
+ * plain ASCII `filename` for clients that do not understand the first. This
+ * reads them in that order — taking the ASCII one first would save a document
+ * titled in Urdu or Chinese as "document.md", since nothing of those titles
+ * survives the fallback.
+ */
+function filenameFrom(header: string | null): string {
+  const encoded = header?.match(/filename\*=UTF-8''([^;]+)/i);
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1]);
+    } catch {
+      // Malformed percent-encoding. Fall through to the ASCII name.
+    }
+  }
+
+  return header?.match(/filename="([^"]+)"/)?.[1] ?? "document.md";
 }

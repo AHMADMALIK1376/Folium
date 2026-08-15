@@ -19,7 +19,7 @@ async function typeInto(page: Page, text: string) {
   await body.click();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type(text);
-  await expect(page.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 }
 
 /** Share the open document with `email`, at `permission`. */
@@ -84,7 +84,7 @@ test("an earlier draft can be previewed and restored", async ({ browser }) => {
   await expect(owner.getByText(/first draft by the owner/i)).toBeVisible();
   await expect(owner.getByText(/replaced by the collaborator/i)).toHaveCount(0);
 
-  await expect(owner.getByRole("status")).toHaveText(/^saved$/i);
+  await expect(owner.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
   await owner.reload();
   await expect(owner.getByText(/first draft by the owner/i)).toBeVisible();
 

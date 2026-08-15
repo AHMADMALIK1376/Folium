@@ -64,7 +64,7 @@ test.describe(() => {
     const ownerBody = owner.getByRole("textbox", { name: /document body/i });
     await ownerBody.click();
     await owner.keyboard.type("Written by the owner. ");
-    await expect(owner.getByRole("status")).toHaveText(/^saved$/i);
+    await expect(owner.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
     await shareWith(owner, guestEmail, "edit");
 
@@ -80,12 +80,32 @@ test.describe(() => {
     const occurrences = (await guestBody.innerText()).split("Written by the owner.").length - 1;
     expect(occurrences).toBe(1);
 
+    // Both editors say they are live rather than staying silent about it.
+    await expect(owner.getByText(/^live$/i)).toBeVisible();
+    await expect(guest.getByText(/^live$/i)).toBeVisible();
+
     // Now the other direction, live, with no reload on either side.
     await guestBody.click();
     await guest.keyboard.press("End");
     await guest.keyboard.type("And by the collaborator.");
 
     await expect(ownerBody).toContainText("And by the collaborator.");
+
+    // Both carets have to be live for each side to render the other's label — a
+    // remote cursor is only drawn while that person holds a selection — so the
+    // owner types again before either is asserted.
+    await ownerBody.click();
+    await owner.keyboard.type("!");
+
+    // Each caret carries its own person's name. Phase 4-i labelled every cursor
+    // with the document owner's, so on a shared document everyone appeared as
+    // whoever created it — this is the assertion that would have caught it.
+    await expect(owner.locator(".collaboration-cursor__label").first()).toContainText(
+      /e2e-collab-guest/i,
+    );
+    await expect(guest.locator(".collaboration-cursor__label").first()).toContainText(
+      /e2e-collab-owner/i,
+    );
 
     // Both texts survive a reload, which means the merged document reached
     // Postgres rather than living only in the room.
@@ -114,7 +134,7 @@ test.describe(() => {
     await owner.getByRole("link", { name: /untitled document/i }).click();
     await owner.getByRole("textbox", { name: /document body/i }).click();
     await owner.keyboard.type("Only the owner may write this.");
-    await expect(owner.getByRole("status")).toHaveText(/^saved$/i);
+    await expect(owner.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
 
     await shareWith(owner, guestEmail, "view");
 

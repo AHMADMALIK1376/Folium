@@ -20,4 +20,10 @@ async def test_can_create_user_and_document():
         stored = found.scalar_one()
         assert stored.title == "First doc"
         assert stored.is_deleted is False
-        assert stored.content == {"type": "doc", "content": [{"type": "paragraph"}]}
+        # `attrs` because TipTap's TextAlign extension is configured for
+        # paragraphs, and ProseMirror serialises an attribute even at its
+        # default — empty_doc() produces what the editor would.
+        assert stored.content == {
+            "type": "doc",
+            "content": [{"type": "paragraph", "attrs": {"textAlign": None}}],
+        }

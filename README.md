@@ -32,6 +32,8 @@ share them with other people.
 | [4-ii](docs/superpowers/plans/2026-08-01-phase-4-ii-collaboration-durability.md) | Cursor identity, a connection indicator, and repairing stale documents | Done |
 | [5-i](docs/superpowers/plans/2026-08-01-phase-5-i-export.md) | Export: download as Markdown, or print as a PDF | Done |
 | [5-ii](docs/superpowers/plans/2026-08-15-phase-5-ii-attachments.md) | Attachments, stored in Supabase Storage | Done |
+| [6-i](docs/superpowers/plans/2026-08-15-phase-6-i-editor-parity.md) | Editor parity: every type the editor makes survives export | Done |
+| [6-ii](docs/superpowers/plans/2026-08-16-phase-6-ii-links-tasks.md) | Links and checklists | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -54,7 +56,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 ## What it does
 
 - Create, rename, and edit rich-text documents — bold, italic, underline, strikethrough, inline code,
-  headings, quotes, code blocks, rules, and bulleted/numbered lists — with autosave.
+  links, headings, quotes, code blocks, rules, checklists, and bulleted/numbered lists — with autosave.
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
@@ -155,8 +157,20 @@ what to do with it.
 | Lists | `-` and numbered |
 | Horizontal rules | `---` |
 | Line breaks | trailing `\` |
+| Links | `[text](url)` |
+| Checklists | `- [ ]`, `- [x]` |
 
-Still unsupported, in both directions: tables, links, images, nested lists, and lists inside quotes.
+Still unsupported, in both directions: tables, images, nested lists, and lists inside quotes.
+
+**Links carry a protocol allow-list — `http`, `https`, `mailto` — enforced in the editor *and* the
+importer.** This is a security boundary, not tidiness: a link is the only content type where the
+author supplies something the *reader's* browser will act on, so `javascript:` in an `href` would be
+script execution in the reader's session, on a document they may only be permitted to view. A `.md`
+file is untrusted input, which is why the importer checks too rather than trusting the browser. A
+refused link keeps its text and loses only the mark. Links render with `rel="noopener noreferrer"`.
+
+Autolinking is off: it would turn anything URL-shaped into a link as you type and on paste, creating
+links the author never asked for.
 
 > **A bug worth recording.** Until Phase 6-i, `StarterKit` enabled blockquotes, code blocks,
 > strikethrough and hard breaks — reachable by shortcut, by input rule and by paste — while the

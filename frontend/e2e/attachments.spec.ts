@@ -42,10 +42,22 @@ async function newDocument(page: Page) {
   await expect(page).toHaveURL(/\/documents\//);
 }
 
-/** Skip unless this deployment can actually store files. */
+/** Skip unless this deployment can actually store files.
+ *
+ * The editor has to have loaded before the panel's absence means anything. The
+ * first version of this checked only the heading, so a dashboard that failed to
+ * reach the backend reported "feature disabled" and skipped — a broken run
+ * looking exactly like an unconfigured one, which is the failure mode this whole
+ * helper exists to avoid.
+ */
 async function requireAttachments(page: Page) {
-  const heading = page.getByRole("heading", { name: /^attachments$/i });
-  const enabled = await heading.isVisible().catch(() => false);
+  await expect(page.getByRole("toolbar", { name: /formatting/i })).toBeVisible();
+
+  const enabled = await page
+    .getByRole("heading", { name: /^attachments$/i })
+    .isVisible()
+    .catch(() => false);
+
   test.skip(
     !enabled,
     "Set SUPABASE_SERVICE_ROLE_KEY in backend/.env and create the bucket to exercise attachments",
@@ -97,8 +109,19 @@ test("a disallowed file type is refused without uploading", async ({ page }) => 
 
   await page.getByTestId("attachment-input").setInputFiles(path);
 
-  await expect(page.getByRole("alert")).toContainText(/not a file type/i);
-  await expect(page.getByText("payload.exe")).toBeHidden();
+  const panel = page.getByRole("region", { name: /attachments/i });
+
+  // Scoped to the panel, not `page.getByRole("alert")`: Next.js renders its own
+  // route announcer with role="alert", so an unscoped query matches two elements
+  // and fails strict mode for a reason that has nothing to do with the upload.
+  // The same shape as the two role="status" regions recorded in Phase 4-ii.
+  await expect(panel.getByRole("alert")).toContainText(/not a file type/i);
+
+  // "Nothing attached yet", not `getByText("payload.exe")` — the rejection
+  // message names the file, so searching for the filename finds the very error
+  // proving it was refused.
+  await expect(panel.getByText(/nothing attached yet/i)).toBeVisible();
+  await expect(panel.getByRole("listitem")).toHaveCount(0);
 });
 
 test("a viewer can download an attachment but not change it", async ({ browser }) => {

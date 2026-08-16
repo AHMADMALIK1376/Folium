@@ -158,3 +158,49 @@ test("a slash mid-sentence is just a character", async ({ page }) => {
 
   await expect(page.getByRole("listbox", { name: /insert a block/i })).toBeHidden();
 });
+
+test("a table survives export, pipes and all", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("table"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("/table");
+  await page.keyboard.press("Enter");
+
+  // 3x3 with a header row: GFM cannot express a headerless table, so one
+  // without a header would export as prose containing pipes.
+  await expect(page.locator(".folium-prose table")).toHaveCount(1);
+  await expect(page.locator(".folium-prose th")).toHaveCount(3);
+
+  // The caret lands in the first header cell.
+  await page.keyboard.type("Name");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("a|b");
+
+  // Row and column controls appear only inside a table.
+  await expect(page.getByRole("toolbar", { name: "Table" })).toBeVisible();
+
+  const markdown = await exportedMarkdown(page);
+
+  expect(markdown).toContain("| Name |");
+  // Escaped, or it would split the author's content into two cells on the way
+  // back in.
+  // A raw string: "a\|b" in source is just "a|b" to JavaScript, since \| is not
+  // an escape sequence — which is the opposite of what this asserts.
+  expect(markdown).toContain(String.raw`a\|b`);
+  expect(markdown).toContain("|---|");
+});
+
+test("the table controls are absent outside a table", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("notable"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("Just a sentence.");
+
+  await expect(page.getByRole("toolbar", { name: "Table" })).toBeHidden();
+});

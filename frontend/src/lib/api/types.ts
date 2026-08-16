@@ -17,6 +17,20 @@ export interface DocumentSummary {
   updated_at: string;
 }
 
+/** A search hit: the document, plus why it matched.
+ *
+ * The snippet is the point — a list of titles does not say what was found, and
+ * "Untitled document" three times over is not an answer. */
+export interface SearchResult extends DocumentSummary {
+  snippet: string;
+  owned: boolean;
+}
+
+export interface SearchResults {
+  query: string;
+  results: SearchResult[];
+}
+
 export interface DocumentListResponse {
   owned: DocumentSummary[];
   shared: DocumentSummary[];

@@ -4,6 +4,7 @@ import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { CreateDocumentButton } from "@/components/documents/CreateDocumentButton";
 import { DeleteDocumentDialog } from "@/components/documents/DeleteDocumentDialog";
 import { DocumentList } from "@/components/documents/DocumentList";
+import { DocumentSearch } from "@/components/documents/DocumentSearch";
 import { ImportDocumentButton } from "@/components/documents/ImportDocumentButton";
 import { getDocuments } from "@/lib/api/server";
 import type { DocumentListResponse } from "@/lib/api/types";
@@ -30,6 +31,8 @@ export default async function DashboardPage() {
           <CreateDocumentButton />
         </div>
       </div>
+
+      <DocumentSearch />
 
       <DocumentList
         title="Your documents"

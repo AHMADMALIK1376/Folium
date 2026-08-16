@@ -36,6 +36,7 @@ share them with other people.
 | [6-ii](docs/superpowers/plans/2026-08-16-phase-6-ii-links-tasks.md) | Links and checklists | Done |
 | [6-iii](docs/superpowers/specs/2026-08-16-phase-6-iii-slash-menu-tables-design.md) | A `/` menu for inserting any block | Done |
 | 6-iv | Tables | Done |
+| [7-i](docs/superpowers/specs/2026-08-16-phase-7-i-search-design.md) | Search across titles and bodies | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -69,6 +70,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
   type — when a collaboration server is configured.
 - Browse a document's version history, preview an earlier draft, and restore it.
+- Search your documents by any word in a title or a body, including ones shared with you.
 - Delete a document and restore it from the trash.
 - Everything persists and survives a refresh or a server restart.
 
@@ -378,6 +380,8 @@ DEPLOY.md               deployment guide
   the fact that files are served from a signed URL on a different origin.
 - **Deleting a document leaves its attachments in storage**, because the delete is reversible. There
   is no permanent delete, so nothing removes them.
+- **Search is lexical, not semantic.** It matches words, not meaning: searching "money" will not
+  find "revenue". Worth stating, because the alternative is concluding search is broken.
 - **No comments**, though the permission model already carries a `comment` level for them.
 
 ## Development

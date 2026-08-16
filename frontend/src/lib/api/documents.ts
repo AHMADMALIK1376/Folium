@@ -6,6 +6,7 @@ import type {
   CollabSession,
   DocumentDetail,
   GrantablePermission,
+  SearchResults,
   Share,
   TipTapDoc,
   VersionDetail,
@@ -138,6 +139,17 @@ export function getCollabSession(id: string): Promise<CollabSession> {
   return apiFetch<CollabSession>(`/api/v1/documents/${id}/collab`, {
     method: "POST",
   });
+}
+
+/** Search titles and bodies of documents the caller can see.
+ *
+ * The query is sent as-is: the backend uses websearch_to_tsquery, which accepts
+ * quoted phrases and a leading minus and — the reason it was chosen — does not
+ * raise on a half-typed one. Sanitising here would only remove capability. */
+export function searchDocuments(query: string): Promise<SearchResults> {
+  return apiFetch<SearchResults>(
+    `/api/v1/documents/search?q=${encodeURIComponent(query)}`,
+  );
 }
 
 /** What is attached to a document. Follows view permission. */

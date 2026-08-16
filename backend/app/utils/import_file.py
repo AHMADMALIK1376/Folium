@@ -61,12 +61,17 @@ _INLINE_PATTERN = re.compile(
     r"(?P<code>(?<!\\)`(?P<code_text>[^`]+)`)"
     r"|(?P<link>(?<!\\)\[(?P<link_text>[^\]]*)\]\((?P<link_href>[^)]*)\))"
     r"|(?P<underline><u>(?P<underline_text>.+?)</u>)"
+    # Before bold, and it has to be its own alternative rather than falling out
+    # of bold-then-italic. On "***x***" the bold pattern's non-greedy body stops
+    # at the first "**" it can, capturing "*x" and stranding the closing
+    # asterisk in the text — which is exactly how bold+italic came back corrupted.
+    r"|(?P<bolditalic>(?<!\\)\*\*\*(?P<bolditalic_text>.+?)(?<!\\)\*\*\*)"
     r"|(?P<bold>(?<!\\)\*\*(?P<bold_text>.+?)(?<!\\)\*\*)"
     r"|(?P<strike>(?<!\\)~~(?P<strike_text>.+?)(?<!\\)~~)"
     r"|(?P<italic>(?<!\\)(?<!\*)\*(?!\*)(?P<italic_text>.+?)(?<!\\)\*(?!\*))"
 )
 
-_MARK_NAMES = ("code", "link", "underline", "bold", "strike", "italic")
+_MARK_NAMES = ("code", "link", "underline", "bolditalic", "bold", "strike", "italic")
 
 
 def _unescape(text: str) -> str:
@@ -86,10 +91,24 @@ def _text_node(text: str, mark: str | None = None) -> dict[str, Any]:
     return node
 
 
-def _inline(text: str) -> list[dict[str, Any]]:
+def _marked_node(text: str, marks: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    node: dict[str, Any] = {"type": "text", "text": text}
+    if marks:
+        node["marks"] = [dict(mark) for mark in marks]
+    return node
+
+
+def _inline(text: str, marks: tuple[dict[str, Any], ...] = ()) -> list[dict[str, Any]]:
     """Split a line into TipTap text nodes, applying marks.
 
-    Bold is matched before italic so that ** is never read as a pair of single
+    Recursive, and that is the whole point: a run can carry more than one mark.
+    Before this recursed, `***important***` matched bold and kept `*important*`
+    as literal text, so a run that was bold *and* italic came back from a round
+    trip with visible asterisks in the prose. Every combination was lossy — the
+    same class of silent corruption as Phase 6-i, and missed for the same
+    reason: nothing tested more than one mark at a time.
+
+    Bold is matched before italic so `**` is never read as a pair of single
     asterisks, and code before everything, because its content is literal.
     """
     nodes: list[dict[str, Any]] = []
@@ -97,7 +116,7 @@ def _inline(text: str) -> list[dict[str, Any]]:
 
     for match in _INLINE_PATTERN.finditer(text):
         if match.start() > pos:
-            nodes.append(_text_node(_unescape(text[pos : match.start()])))
+            nodes.append(_marked_node(_unescape(text[pos : match.start()]), marks))
 
         for name in _MARK_NAMES:
             if match.group(name) is None:
@@ -105,33 +124,44 @@ def _inline(text: str) -> list[dict[str, Any]]:
 
             body = match.group(f"{name}_text")
 
-            if name == "link":
+            if name == "code":
+                # Never recursed into and never unescaped: the content is
+                # literal, so `**a**` inside backticks is code that contains
+                # asterisks rather than bold.
+                nodes.append(_marked_node(body, (*marks, {"type": "code"})))
+
+            elif name == "link":
                 href = _unescape(match.group("link_href").strip())
-                text = _unescape(body)
                 if is_safe_url(href):
-                    node = _text_node(text, "link")
-                    node["marks"][0]["attrs"] = {"href": href}
-                    nodes.append(node)
+                    nodes.extend(
+                        _inline(body, (*marks, {"type": "link", "attrs": {"href": href}}))
+                    )
                 else:
                     # The mark is dropped, the words are kept. Discarding the
                     # text as well would lose an author's sentence to a URL they
                     # may not even have written — a second bug on top of the one
                     # being prevented.
-                    nodes.append(_text_node(text))
-                break
+                    nodes.extend(_inline(body, marks))
 
-            # Not unescaped inside code: a backslash there is a character in the
-            # sample, and removing it changes the code.
-            nodes.append(_text_node(body if name == "code" else _unescape(body), name))
+            elif name == "bolditalic":
+                # Outermost first, matching the order export applies them in:
+                # italic is wrapped by bold, so bold is the outer mark.
+                nodes.extend(
+                    _inline(body, (*marks, {"type": "bold"}, {"type": "italic"}))
+                )
+
+            else:
+                nodes.extend(_inline(body, (*marks, {"type": name})))
+
             break
 
         pos = match.end()
 
     if pos < len(text):
-        nodes.append(_text_node(_unescape(text[pos:])))
+        nodes.append(_marked_node(_unescape(text[pos:]), marks))
 
     if not nodes and text:
-        nodes.append(_text_node(_unescape(text)))
+        nodes.append(_marked_node(_unescape(text), marks))
 
     return nodes
 
@@ -534,15 +564,10 @@ def _inline_to_markdown(nodes: Any) -> str:
 
         text = _escape_inline(raw)
 
-        if "link" in marks:
-            href = _href_of(node)
-            # An unsafe href never survives import, but a document could hold one
-            # from before this rule existed, so it is checked on the way out too.
-            if href and is_safe_url(href):
-                out.append(f"[{text}]({href})")
-                continue
-
-        # Innermost first, so **_both_** nests rather than interleaving.
+        # Innermost first, so a run carrying several marks nests rather than
+        # interleaving. The order here is the contract the importer is written
+        # against: reversing it would still produce valid Markdown and would
+        # stop round-tripping.
         if "italic" in marks:
             text = f"*{text}*"
         if "strike" in marks:
@@ -553,6 +578,15 @@ def _inline_to_markdown(nodes: Any) -> str:
         # it would silently lose something the author deliberately applied.
         if "underline" in marks:
             text = f"<u>{text}</u>"
+
+        # Outermost, and applied last rather than returning early — a link may
+        # also be bold, and short-circuiting here dropped every other mark on it.
+        if "link" in marks:
+            href = _href_of(node)
+            # An unsafe href never survives import, but a document could hold one
+            # from before this rule existed, so it is checked on the way out too.
+            if href and is_safe_url(href):
+                text = f"[{text}]({href})"
 
         out.append(text)
 

@@ -375,21 +375,27 @@ def test_a_javascript_url_is_refused_on_import():
     """The security case. A link is the first content type where the author
     supplies something the READER's browser will act on, and a viewer may only
     have been given permission to read."""
-    result = markdown_to_doc("[click me](javascript:alert(1))")
+    [para] = markdown_to_doc("[click me](javascript:alert(1))")["content"]
+    nodes = para["content"]
 
-    [para] = result["content"]
-    [node] = para["content"]
     # The words survive; only the mark is dropped. Discarding the sentence would
     # be a second bug on top of the one being prevented.
-    assert node["text"] == "click me"
-    assert "marks" not in node
+    assert "".join(n["text"] for n in nodes).startswith("click me")
+    # Nothing anywhere carries a link. Asserting on a single node used to pass
+    # for the wrong reason: `_inline` shadowed its own `text` parameter, so the
+    # trailing ")" left over from the truncated href was silently dropped
+    # instead of surviving as the text it is.
+    assert not any(
+        m["type"] == "link" for n in nodes for m in n.get("marks", [])
+    )
 
 
 def test_other_dangerous_schemes_are_refused():
     for url in ["data:text/html;base64,PHNjcmlwdD4=", "vbscript:msgbox(1)", "JavaScript:alert(1)"]:
         [para] = markdown_to_doc(f"[x]({url})")["content"]
-        [node] = para["content"]
-        assert "marks" not in node, f"{url} was allowed through"
+        assert not any(
+            m["type"] == "link" for n in para["content"] for m in n.get("marks", [])
+        ), f"{url} was allowed through"
 
 
 def test_a_task_list_becomes_checkboxes():

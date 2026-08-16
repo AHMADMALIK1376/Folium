@@ -15,6 +15,7 @@ import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
+import { SlashMenu } from "@/components/editor/SlashMenu";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
 import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
 // Aliased: TipTap's Collaboration extension already owns that name here.
@@ -299,7 +300,13 @@ function DocumentEditorSurface({
       </h1>
 
       {editor && editable && <EditorToolbar editor={editor} />}
-      <EditorContent editor={editor} />
+      {/* Positioned relative so the menu can hang off the editor rather than the
+          page, and rendered only for editors — everything it inserts is refused
+          for a viewer anyway. */}
+      <div className="relative">
+        <EditorContent editor={editor} />
+        {editor && editable && <SlashMenu editor={editor} />}
+      </div>
 
       {/* Absent entirely when the deployment has no storage key, rather than an
           empty state or an error: an unconfigured feature is not a broken one,

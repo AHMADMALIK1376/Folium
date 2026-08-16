@@ -13,6 +13,7 @@ import { AttachmentsPanel } from "@/components/editor/AttachmentsPanel";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
+import { FormattingControls } from "@/components/editor/FormattingControls";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { SlashMenu } from "@/components/editor/SlashMenu";
@@ -254,7 +255,7 @@ function DocumentEditorSurface({
         {collab.enabled && <ConnectionStatus status={collab.status} />}
 
         {/* Offered whatever the permission: exporting is reading. */}
-        <ExportDialog documentId={document.id} />
+        <ExportDialog documentId={document.id} content={editor?.getJSON()} />
 
         <HistoryDialog
           documentId={document.id}
@@ -301,6 +302,7 @@ function DocumentEditorSurface({
       </h1>
 
       {editor && editable && <EditorToolbar editor={editor} />}
+      {editor && editable && <FormattingControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
       {/* Positioned relative so the menu can hang off the editor rather than the
           page, and rendered only for editors — everything it inserts is refused

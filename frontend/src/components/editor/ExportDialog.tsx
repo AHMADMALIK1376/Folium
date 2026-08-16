@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { exportMarkdown } from "@/lib/api/documents";
+import { lossyWarning } from "@/lib/editor/lossy";
 
 /** Take a document out of Folium.
  *
@@ -20,10 +21,19 @@ import { exportMarkdown } from "@/lib/api/documents";
  * reading, and someone who can see every word on screen loses nothing by
  * keeping a copy.
  */
-export function ExportDialog({ documentId }: { documentId: string }) {
+export function ExportDialog({
+  documentId,
+  content,
+}: {
+  documentId: string;
+  /** The document as it stands, for warning about formatting Markdown drops. */
+  content?: unknown;
+}) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+
+  const warning = lossyWarning(content);
 
   const downloadMarkdown = async () => {
     setError(null);
@@ -82,6 +92,18 @@ export function ExportDialog({ documentId }: { documentId: string }) {
             notFoundMessage="This document is no longer available."
             fallback="Could not export the document. Try again."
           />
+        )}
+
+        {warning && (
+          // Said before the button is pressed, not after the file is written.
+          // A lossy export is a defensible trade; a silent one is the bug this
+          // project spent Phase 6 fixing three times.
+          <p
+            role="note"
+            className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+          >
+            {warning}
+          </p>
         )}
 
         <div className="grid gap-2">

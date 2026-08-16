@@ -27,6 +27,11 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     run: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
   },
   {
+    label: "Heading 3",
+    keywords: ["h3", "subsection"],
+    run: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+  },
+  {
     label: "Text",
     keywords: ["paragraph", "body", "plain"],
     run: (editor) => editor.chain().focus().setParagraph().run(),

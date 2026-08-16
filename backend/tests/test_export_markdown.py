@@ -429,3 +429,109 @@ def test_a_paragraph_beginning_with_brackets_is_not_a_task():
     original = doc(paragraph(text("[ ] not a checkbox")))
 
     assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+# --- Phase 6-iv: tables ---
+
+
+def cell(text_value: str, header: bool = False, align=None) -> dict:
+    attrs: dict = {"colspan": 1, "rowspan": 1, "colwidth": None}
+    if align:
+        attrs["textAlign"] = align
+    return {
+        "type": "tableHeader" if header else "tableCell",
+        "attrs": attrs,
+        "content": [paragraph(text(text_value))],
+    }
+
+
+def row(*cells) -> dict:
+    return {"type": "tableRow", "content": list(cells)}
+
+
+def table(*rows) -> dict:
+    return {"type": "table", "content": list(rows)}
+
+
+def test_a_table_becomes_gfm():
+    result = doc_to_markdown(
+        doc(
+            table(
+                row(cell("Name", header=True), cell("Role", header=True)),
+                row(cell("Ana"), cell("Lead")),
+            )
+        )
+    )
+
+    assert result == "| Name | Role |\n|---|---|\n| Ana | Lead |"
+
+
+def test_a_table_survives_a_round_trip():
+    original = doc(
+        table(
+            row(cell("Name", header=True), cell("Role", header=True)),
+            row(cell("Ana"), cell("Lead")),
+        )
+    )
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_alignment_survives_because_gfm_can_express_it():
+    """The one place alignment enters the product, and it is here only because
+    Markdown can carry it — unlike the text alignment Phase 6-i refused."""
+    original = doc(
+        table(
+            row(
+                cell("L", header=True, align="left"),
+                cell("C", header=True, align="center"),
+                cell("R", header=True, align="right"),
+            ),
+            row(
+                cell("a", align="left"),
+                cell("b", align="center"),
+                cell("c", align="right"),
+            ),
+        )
+    )
+    exported = doc_to_markdown(original)
+
+    assert "|:---|:---:|---:|" in exported
+    assert markdown_to_doc(exported) == original
+
+
+def test_a_pipe_inside_a_cell_survives():
+    """It is the cell delimiter, so an unescaped one splits the author's content
+    into two cells on the way back."""
+    original = doc(
+        table(row(cell("a|b", header=True)), row(cell("c|d")))
+    )
+    exported = doc_to_markdown(original)
+
+    assert r"a\|b" in exported
+    assert markdown_to_doc(exported) == original
+
+
+def test_a_short_row_is_padded_rather_than_refused():
+    """A hand-written file is allowed to be untidy."""
+    [block] = markdown_to_doc("| A | B |\n|---|---|\n| only one |")["content"]
+
+    assert [c["type"] for c in block["content"][1]["content"]] == ["tableCell", "tableCell"]
+
+
+def test_pipes_without_a_delimiter_row_are_not_a_table():
+    """Without the delimiter row it is not a table in GFM — it is a paragraph
+    that happens to contain pipes, and swallowing it would lose the text."""
+    [block] = markdown_to_doc("| this | is | prose |")["content"]
+
+    assert block["type"] == "paragraph"
+
+
+def test_cells_are_not_padded_to_equal_width():
+    """Aligned columns make a prettier file and a worse diff: editing one cell
+    would rewrite every line of the column."""
+    result = doc_to_markdown(
+        doc(table(row(cell("a", header=True)), row(cell("a much longer cell"))))
+    )
+
+    assert "| a |" in result

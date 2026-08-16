@@ -34,6 +34,8 @@ share them with other people.
 | [5-ii](docs/superpowers/plans/2026-08-15-phase-5-ii-attachments.md) | Attachments, stored in Supabase Storage | Done |
 | [6-i](docs/superpowers/plans/2026-08-15-phase-6-i-editor-parity.md) | Editor parity: every type the editor makes survives export | Done |
 | [6-ii](docs/superpowers/plans/2026-08-16-phase-6-ii-links-tasks.md) | Links and checklists | Done |
+| [6-iii](docs/superpowers/specs/2026-08-16-phase-6-iii-slash-menu-tables-design.md) | A `/` menu for inserting any block | Done |
+| 6-iv | Tables | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -56,7 +58,8 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 ## What it does
 
 - Create, rename, and edit rich-text documents — bold, italic, underline, strikethrough, inline code,
-  links, headings, quotes, code blocks, rules, checklists, and bulleted/numbered lists — with autosave.
+  links, headings, quotes, code blocks, rules, checklists, tables, and bulleted/numbered lists — with
+  autosave. Type `/` on an empty line to insert any of them without reaching for the toolbar.
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
@@ -159,8 +162,10 @@ what to do with it.
 | Line breaks | trailing `\` |
 | Links | `[text](url)` |
 | Checklists | `- [ ]`, `- [x]` |
+| Tables | GFM pipe tables, with column alignment |
 
-Still unsupported, in both directions: tables, images, nested lists, and lists inside quotes.
+Still unsupported, in both directions: images, nested lists, lists inside quotes, and merged table
+cells — GFM cannot express `colspan` at all.
 
 **Links carry a protocol allow-list — `http`, `https`, `mailto` — enforced in the editor *and* the
 importer.** This is a security boundary, not tidiness: a link is the only content type where the
@@ -351,11 +356,15 @@ DEPLOY.md               deployment guide
   author, and only the newest 50 per document, so the very last keystrokes before a mistake may not
   have their own version.
 - **Markdown import and export cover what the editor can produce, and no more** — see the table under
-  File import. The two match deliberately, so a round trip is lossless. Tables, links, images and
-  nested lists are unsupported in both directions.
-- **Text colour, alignment, and fonts are deliberately absent.** Markdown cannot express them, so
-  adding them would mean either emitting HTML the importer would have to parse or giving up the
-  lossless round trip. That trade belongs to a phase that decides it openly, not to a colour button.
+  File import. The two match deliberately, so a round trip is lossless. Images, nested lists and
+  merged table cells are unsupported in both directions.
+- **A table cell holds inline text only.** GFM cannot express a list inside a cell, so cell content is
+  flattened on export. This is the one place the converters knowingly lose structure, and it is why
+  tables took their own phase rather than riding along with links.
+- **Text colour, fonts, and text alignment outside tables are deliberately absent.** Markdown cannot
+  express them, so adding them would mean emitting HTML the importer would have to parse, or giving up
+  the lossless round trip. Column alignment *is* supported, and the distinction is exactly that: GFM
+  can carry `:---:` and has no way at all to say "this paragraph is centred".
 - **PDF export is the browser's print dialog**, so the browser chooses the filename and the output
   varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address

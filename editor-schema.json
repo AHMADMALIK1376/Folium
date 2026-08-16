@@ -28,6 +28,10 @@
     "listItem",
     "orderedList",
     "paragraph",
+    "table",
+    "tableCell",
+    "tableHeader",
+    "tableRow",
     "taskItem",
     "taskList",
     "text"
@@ -37,6 +41,9 @@
     "doc": "The document root itself, not content within it.",
     "text": "Carries the characters every other rule renders; not a block or a mark.",
     "listItem": "Rendered by its parent bulletList or orderedList, never on its own.",
-    "taskItem": "Rendered by its parent taskList, never on its own."
+    "taskItem": "Rendered by its parent taskList, never on its own.",
+    "tableRow": "Rendered by its parent table, never on its own.",
+    "tableCell": "Rendered by its parent tableRow, never on its own.",
+    "tableHeader": "Rendered by its parent tableRow, never on its own."
   }
 }

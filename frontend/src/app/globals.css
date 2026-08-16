@@ -219,6 +219,45 @@
   outline: none;
 }
 
+/* Tables. ProseMirror renders the structure and nothing else, so without these
+   a table is an unreadable run of text with no cell boundaries at all. */
+.folium-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  table-layout: fixed;
+}
+
+.folium-prose th,
+.folium-prose td {
+  border: 1px solid var(--color-neutral-300, #d4d4d4);
+  padding: 0.4em 0.6em;
+  vertical-align: top;
+  /* Long unbroken content would otherwise widen the column past the page. */
+  overflow-wrap: anywhere;
+}
+
+.folium-prose th {
+  background: var(--color-neutral-50, #fafafa);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* The cell the caret is in, and any selected range. Without this, editing a
+   table is done blind. */
+.folium-prose .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+.folium-prose td,
+.folium-prose th {
+  position: relative;
+}
+
 /* Printing, which is also how a PDF is made.
    No PDF library on either side: an Export action opens the browser's print
    dialog, where every current OS offers "Save as PDF". What follows is the
@@ -259,10 +298,26 @@
   }
 
   /* Borders and rounding belong to the application, not to a printed page. */
-  main * {
+  main *:not(table):not(th):not(td) {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+  }
+
+  /* Exempted from the reset above, deliberately: that rule predates tables, and
+     a table without cell borders is not a table on paper — it is a run of
+     words. */
+  .folium-prose table,
+  .folium-prose th,
+  .folium-prose td {
+    border: 1px solid #999 !important;
+    border-collapse: collapse;
+  }
+
+  /* A table broken across a page loses its header row and with it its sense. */
+  .folium-prose table {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* A heading stranded at the foot of a page, or a list item split across two,

@@ -76,6 +76,49 @@ NODE_SAMPLES: dict[str, dict] = {
             {"type": "text", "text": "two"},
         ],
     },
+    "table": {
+        "type": "table",
+        "content": [
+            {
+                "type": "tableRow",
+                "content": [
+                    {
+                        "type": "tableHeader",
+                        "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                        "content": [
+                            {"type": "paragraph", "content": [{"type": "text", "text": "Name"}]}
+                        ],
+                    },
+                    {
+                        "type": "tableHeader",
+                        "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                        "content": [
+                            {"type": "paragraph", "content": [{"type": "text", "text": "Role"}]}
+                        ],
+                    },
+                ],
+            },
+            {
+                "type": "tableRow",
+                "content": [
+                    {
+                        "type": "tableCell",
+                        "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                        "content": [
+                            {"type": "paragraph", "content": [{"type": "text", "text": "Ana"}]}
+                        ],
+                    },
+                    {
+                        "type": "tableCell",
+                        "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                        "content": [
+                            {"type": "paragraph", "content": [{"type": "text", "text": "Lead"}]}
+                        ],
+                    },
+                ],
+            },
+        ],
+    },
     "taskList": {
         "type": "taskList",
         "content": [

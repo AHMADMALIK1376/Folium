@@ -1,4 +1,8 @@
 import Link from "@tiptap/extension-link";
+import Table from "@tiptap/extension-table";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TableRow from "@tiptap/extension-table-row";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import Underline from "@tiptap/extension-underline";
@@ -55,5 +59,14 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     // Nesting is out of scope this phase, and the Markdown converters would have
     // to learn indentation to carry it.
     TaskItem.configure({ nested: false }),
+    Table.configure({
+      // GFM has no column widths, so a resized column would look right in the
+      // editor and vanish on export — a difference the author never asked for
+      // and would only discover later.
+      resizable: false,
+    }),
+    TableRow,
+    TableHeader,
+    TableCell,
   ];
 }

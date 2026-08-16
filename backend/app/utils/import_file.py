@@ -14,6 +14,11 @@ RULE_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
 # Checked before BULLET_RE, always: "- [ ] milk" also matches a bullet, whose
 # text would then be "[ ] milk" — a checklist quietly demoted to a list.
 TASK_RE = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.*)$")
+# A table row is any line with a pipe that is not escaped. The delimiter row —
+# |---|:--:| — is what actually makes it a table in GFM; without one it is
+# paragraphs that happen to contain pipes, so both are required.
+ROW_RE = re.compile(r"^\s*\|(.+)\|\s*$")
+DELIMITER_RE = re.compile(r"^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$")
 
 # The protocols a link may use, mirrored in frontend/src/lib/editor/extensions.ts
 # and enforced in both. A `.md` file is untrusted input and this importer is a
@@ -131,6 +136,56 @@ def _inline(text: str) -> list[dict[str, Any]]:
     return nodes
 
 
+def _split_row(line: str) -> list[str]:
+    r"""Split "| a | b |" into cells, respecting escaped pipes.
+
+    A `\|` is a pipe the author typed, not a cell boundary — splitting on it
+    would silently cut their content in half.
+    """
+    inner = ROW_RE.match(line).group(1)
+    cells: list[str] = []
+    current = ""
+    index = 0
+
+    while index < len(inner):
+        char = inner[index]
+        if char == "\\" and index + 1 < len(inner) and inner[index + 1] == "|":
+            current += "|"
+            index += 2
+            continue
+        if char == "|":
+            cells.append(current.strip())
+            current = ""
+        else:
+            current += char
+        index += 1
+
+    cells.append(current.strip())
+    return cells
+
+
+def _alignments(delimiter: str) -> list[str | None]:
+    out: list[str | None] = []
+    for cell in _split_row(delimiter):
+        left, right = cell.startswith(":"), cell.endswith(":")
+        out.append("center" if left and right else "right" if right else "left" if left else None)
+    return out
+
+
+def _cell(text: str, header: bool, align: str | None) -> dict[str, Any]:
+    # colspan and rowspan are TipTap's own defaults and must be present, or the
+    # node this produces is not one the editor could have made — the same trap
+    # codeBlock's `language` set in Phase 6-i.
+    attrs: dict[str, Any] = {"colspan": 1, "rowspan": 1, "colwidth": None}
+    if align:
+        attrs["textAlign"] = align
+    return {
+        "type": "tableHeader" if header else "tableCell",
+        "attrs": attrs,
+        "content": [_paragraph(text)],
+    }
+
+
 def _paragraph_from_lines(lines: list[str]) -> dict[str, Any]:
     r"""Build one paragraph from lines joined by hard breaks.
 
@@ -216,6 +271,47 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
 
             inner_doc = markdown_to_doc("\n".join(quoted))
             content.append({"type": "blockquote", "content": inner_doc.get("content", [])})
+            continue
+
+        # A table needs its delimiter row to be a table at all, so the next line
+        # is inspected before committing. Without that check a paragraph
+        # containing pipes would be swallowed as a one-row table.
+        if (
+            ROW_RE.match(line)
+            and index + 1 < len(lines)
+            and DELIMITER_RE.match(lines[index + 1].rstrip())
+        ):
+            close_list()
+            aligns = _alignments(lines[index + 1].rstrip())
+            headers = _split_row(line)
+            rows = [
+                {
+                    "type": "tableRow",
+                    "content": [
+                        _cell(cell, True, aligns[i] if i < len(aligns) else None)
+                        for i, cell in enumerate(headers)
+                    ],
+                }
+            ]
+
+            index += 2
+            while index < len(lines) and ROW_RE.match(lines[index].rstrip()):
+                cells = _split_row(lines[index].rstrip())
+                # Padded rather than refused: a hand-written file is allowed to
+                # be untidy, and a short row is obvious in intent.
+                cells += [""] * (len(headers) - len(cells))
+                rows.append(
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            _cell(cell, False, aligns[i] if i < len(aligns) else None)
+                            for i, cell in enumerate(cells[: len(headers)])
+                        ],
+                    }
+                )
+                index += 1
+
+            content.append({"type": "table", "content": rows})
             continue
 
         # Before the bullet rule, which would otherwise never see it — "---" has
@@ -501,6 +597,65 @@ def _blockquote_to_markdown(block: dict[str, Any]) -> str:
     return "\n".join(f"> {line}".rstrip() for line in inner.split("\n"))
 
 
+_ALIGN_DELIMITERS = {"left": ":---", "center": ":---:", "right": "---:", None: "---"}
+
+
+def _cell_text(cell: Any) -> str:
+    """A cell's content, flattened to inline text.
+
+    GFM cells hold inline content only — a list inside a cell cannot be
+    expressed — so the paragraphs are joined with a space rather than a newline,
+    which would end the row. This is the one place this phase knowingly loses
+    structure, and the spec says so.
+
+    The pipe is escaped last: it is the cell delimiter, and one the author typed
+    would otherwise split their content into two cells on the way back.
+    """
+    if not isinstance(cell, dict):
+        return ""
+    children = cell.get("content")
+    text = " ".join(
+        _inline_to_markdown(child.get("content"))
+        for child in (children if isinstance(children, list) else [])
+        if isinstance(child, dict)
+    ).strip()
+
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _table_to_markdown(block: dict[str, Any]) -> str:
+    rows = block.get("content")
+    rows = [row for row in (rows if isinstance(rows, list) else []) if isinstance(row, dict)]
+    if not rows:
+        return ""
+
+    def cells_of(row: dict[str, Any]) -> list[Any]:
+        cells = row.get("content")
+        return [c for c in (cells if isinstance(cells, list) else []) if isinstance(c, dict)]
+
+    header = cells_of(rows[0])
+    if not header:
+        return ""
+
+    def align_of(cell: dict[str, Any]) -> str | None:
+        attrs = cell.get("attrs")
+        return attrs.get("textAlign") if isinstance(attrs, dict) else None
+
+    lines = [
+        "| " + " | ".join(_cell_text(c) for c in header) + " |",
+        # Not padded to the column's width: aligned cells make a prettier file
+        # and a worse diff, because editing one cell rewrites the whole column.
+        "|" + "|".join(_ALIGN_DELIMITERS[align_of(c)] for c in header) + "|",
+    ]
+
+    for row in rows[1:]:
+        cells = cells_of(row)
+        cells += [{}] * (len(header) - len(cells))
+        lines.append("| " + " | ".join(_cell_text(c) for c in cells[: len(header)]) + " |")
+
+    return "\n".join(lines)
+
+
 def _is_checked(item: Any) -> bool:
     if not isinstance(item, dict):
         return False
@@ -562,6 +717,9 @@ def doc_to_markdown(doc: dict[str, Any]) -> str:
 
         elif kind == "horizontalRule":
             chunks.append("---")
+
+        elif kind == "table":
+            chunks.append(_table_to_markdown(block))
 
         elif kind == "taskList":
             items = block.get("content")

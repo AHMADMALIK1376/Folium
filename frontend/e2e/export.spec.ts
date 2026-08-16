@@ -120,8 +120,11 @@ test("a quote, a code block and struck text all survive export", async ({ page }
 
   await page.getByRole("button", { name: /^quote$/i }).click();
   await page.keyboard.type("A quoted line");
-  await page.getByRole("button", { name: /^quote$/i }).click();
-
+  // Enter twice to leave the quote, NOT a second click on the button: clicking
+  // it again toggles the blockquote off the line just typed, which is exactly
+  // what this test caught the first time it ran. The second Enter lifts an
+  // empty paragraph out of the quote, which is ProseMirror's own behaviour.
+  await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: /strikethrough/i }).click();
   await page.keyboard.type("struck through");

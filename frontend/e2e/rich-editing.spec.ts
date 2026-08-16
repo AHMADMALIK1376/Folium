@@ -123,3 +123,38 @@ test("a script URL is refused by the editor", async ({ page }) => {
   // And nothing was applied — the words are still plain text.
   await expect(page.locator('a[href^="javascript"]')).toHaveCount(0);
 });
+
+test("the slash menu inserts a block by keyboard alone", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("slash"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("/quo");
+
+  const menu = page.getByRole("listbox", { name: /insert a block/i });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("option")).toHaveCount(1);
+
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+
+  await page.keyboard.type("A quoted line");
+
+  // The typed "/quo" must be gone, or the command text stays in the document
+  // beside the block it asked for.
+  expect(await exportedMarkdown(page)).toBe("> A quoted line");
+});
+
+test("a slash mid-sentence is just a character", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("noslash"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("see docs/readme");
+
+  await expect(page.getByRole("listbox", { name: /insert a block/i })).toBeHidden();
+});

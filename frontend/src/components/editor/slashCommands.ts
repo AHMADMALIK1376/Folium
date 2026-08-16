@@ -61,6 +61,18 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     keywords: ["rule", "hr", "separator", "line"],
     run: (editor) => editor.chain().focus().setHorizontalRule().run(),
   },
+  {
+    label: "Table",
+    keywords: ["grid", "rows", "columns"],
+    run: (editor) =>
+      editor
+        .chain()
+        .focus()
+        // With a header row, because GFM has no way to express a table without
+        // one: a headerless table exports as prose containing pipes.
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run(),
+  },
 ];
 
 /** Commands matching a query, in the array's own order.

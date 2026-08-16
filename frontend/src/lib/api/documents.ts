@@ -141,6 +141,20 @@ export function getCollabSession(id: string): Promise<CollabSession> {
   });
 }
 
+/** Star a document, or remove the star.
+ *
+ * PUT rather than POST because it is idempotent: starring twice leaves one
+ * star, which the composite primary key guarantees rather than the client
+ * having to check first.
+ *
+ * Follows view permission — a star is a private bookmark, not a change to the
+ * document, so a collaborator may keep one and nobody else sees it. */
+export function setStarred(id: string, starred: boolean): Promise<void> {
+  return apiFetch<void>(`/api/v1/documents/${id}/star`, {
+    method: starred ? "PUT" : "DELETE",
+  });
+}
+
 /** Search titles and bodies of documents the caller can see.
  *
  * The query is sent as-is: the backend uses websearch_to_tsquery, which accepts

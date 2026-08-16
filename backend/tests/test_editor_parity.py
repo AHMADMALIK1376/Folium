@@ -76,14 +76,42 @@ NODE_SAMPLES: dict[str, dict] = {
             {"type": "text", "text": "two"},
         ],
     },
+    "taskList": {
+        "type": "taskList",
+        "content": [
+            {
+                "type": "taskItem",
+                "attrs": {"checked": False},
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "Buy milk"}]}
+                ],
+            },
+            {
+                "type": "taskItem",
+                "attrs": {"checked": True},
+                "content": [
+                    {"type": "paragraph", "content": [{"type": "text", "text": "Done already"}]}
+                ],
+            },
+        ],
+    },
 }
 
-MARK_SAMPLES: dict[str, dict] = {
-    name: {
+def _marked(name: str, attrs: dict | None = None) -> dict:
+    mark: dict = {"type": name}
+    if attrs:
+        mark["attrs"] = attrs
+    return {
         "type": "paragraph",
-        "content": [{"type": "text", "text": "marked", "marks": [{"type": name}]}],
+        "content": [{"type": "text", "text": "marked", "marks": [mark]}],
     }
-    for name in SCHEMA["marks"]
+
+
+# A link without an href is not a link, so the generic sample cannot cover it.
+MARK_ATTRS: dict[str, dict] = {"link": {"href": "https://example.com"}}
+
+MARK_SAMPLES: dict[str, dict] = {
+    name: _marked(name, MARK_ATTRS.get(name)) for name in SCHEMA["marks"]
 }
 
 
@@ -122,7 +150,7 @@ def test_every_mark_survives_export(name):
     )
 
 
-@pytest.mark.parametrize("name", [n for n in SCHEMA["nodes"] if n not in ("doc", "text", "listItem")])
+@pytest.mark.parametrize("name", [n for n in SCHEMA["nodes"] if n not in EXCLUDED])
 def test_every_node_survives_a_round_trip(name):
     """Export then re-import must reproduce the document.
 

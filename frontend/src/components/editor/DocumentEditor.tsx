@@ -2,9 +2,7 @@
 
 import Collaboration from "@tiptap/extension-collaboration";
 import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
-import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -24,6 +22,7 @@ import type { Collaboration as CollaborationState } from "@/lib/collab/useCollab
 import { cursorColor } from "@/lib/collab/color";
 import { decideOnSync } from "@/lib/collab/reconcile";
 import { useCollaboration } from "@/lib/collab/useCollaboration";
+import { baseExtensions } from "@/lib/editor/extensions";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 
 /** Read-only covers `comment` as well as `view`.
@@ -76,11 +75,10 @@ function DocumentEditorSurface({
 
   const editor = useEditor({
     extensions: [
-      // History is TipTap's own undo stack. With Collaboration it must be off:
-      // Collaboration brings a Yjs-aware undo manager, and running both means
-      // undo either skips your own edits or reverts someone else's.
-      collab.enabled ? StarterKit.configure({ history: false }) : StarterKit,
-      Underline,
+      // Shared with editorSchema.test.ts, which asserts this schema matches
+      // editor-schema.json. Reading the same array is what stops the contract
+      // describing an editor nobody renders.
+      ...baseExtensions({ withHistory: !collab.enabled }),
       ...(collab.enabled && collab.doc
         ? [
             Collaboration.configure({ document: collab.doc }),

@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import Underline from "@tiptap/extension-underline";
-import StarterKit from "@tiptap/starter-kit";
 import { describe, expect, it } from "vitest";
+
+import { baseExtensions } from "@/lib/editor/extensions";
 
 /** Half of the contract that stops Phase 6-i's bug returning.
  *
@@ -25,9 +25,14 @@ const CONTRACT = JSON.parse(
   readFileSync(join(process.cwd(), "..", "editor-schema.json"), "utf-8"),
 ) as { nodes: string[]; marks: string[] };
 
-/** The extensions DocumentEditor actually builds with.
+/** The extensions DocumentEditor actually builds with — the same array, not a
+ *  copy of it.
  *
- * Collaboration and CollaborationCursor are deliberately absent: they add no
+ * This used to hold its own hardcoded list, which could drift from what the
+ * editor really used and leave the contract policing something nobody rendered.
+ * `baseExtensions` is now the single source both read.
+ *
+ * Collaboration and CollaborationCursor are deliberately outside it: they add no
  * nodes or marks of their own, only behaviour, so they cannot affect what a
  * document can contain.
  */
@@ -45,7 +50,11 @@ function schemaNames() {
   const nodes: string[] = [];
   const marks: string[] = [];
 
-  for (const extension of [StarterKit, Underline] as unknown as ExtensionLike[]) {
+  const extensions = baseExtensions({
+    withHistory: true,
+  }) as unknown as ExtensionLike[];
+
+  for (const extension of extensions) {
     const bundle = extension.config?.addExtensions;
     const members =
       typeof bundle === "function"

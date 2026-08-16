@@ -11,11 +11,40 @@ ITALIC_RE = re.compile(r"(?<!\\)(?<!\*)\*(?!\*)(.+?)(?<!\\)\*(?!\*)")
 QUOTE_RE = re.compile(r"^>\s?(.*)$")
 FENCE_RE = re.compile(r"^(`{3,})(.*)$")
 RULE_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
+# Checked before BULLET_RE, always: "- [ ] milk" also matches a bullet, whose
+# text would then be "[ ] milk" — a checklist quietly demoted to a list.
+TASK_RE = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.*)$")
+
+# The protocols a link may use, mirrored in frontend/src/lib/editor/extensions.ts
+# and enforced in both. A `.md` file is untrusted input and this importer is a
+# second door into the same document, so a filter that lived only in the browser
+# would be decoration.
+#
+# `javascript:` in an href is script execution in the *reader's* session, on a
+# document they may only be allowed to view. That is stored XSS in a
+# collaborative editor, which is the worst shape it comes in.
+ALLOWED_PROTOCOLS = ("http", "https", "mailto")
+
+_SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
+
+
+def is_safe_url(url: str) -> bool:
+    """Whether a link target may be stored.
+
+    A URL with no scheme is relative and allowed. Anything naming a scheme must
+    name one on the list — an allow-list rather than a block-list, because
+    `javascript:` has as many spellings as there are ways to hide a colon.
+    """
+    scheme = _SCHEME_RE.match((url or "").strip())
+    if scheme is None:
+        return True
+
+    return scheme.group(1).lower() in ALLOWED_PROTOCOLS
 
 # Every delimiter this module can misread, and nothing more. Adding a character
 # here means adding it to ESCAPED_RE too: the two must reverse each other
 # exactly, or a round trip loses text.
-ESCAPED_RE = re.compile(r"\\([\\*#\-.`~>])")
+ESCAPED_RE = re.compile(r"\\([\\*#\-.`~>\[\]])")
 
 # Marks, in the order they must be matched.
 #
@@ -25,13 +54,14 @@ ESCAPED_RE = re.compile(r"\\([\\*#\-.`~>])")
 # emits itself, and leaving it to be picked apart by * matching would corrupt it.
 _INLINE_PATTERN = re.compile(
     r"(?P<code>(?<!\\)`(?P<code_text>[^`]+)`)"
+    r"|(?P<link>(?<!\\)\[(?P<link_text>[^\]]*)\]\((?P<link_href>[^)]*)\))"
     r"|(?P<underline><u>(?P<underline_text>.+?)</u>)"
     r"|(?P<bold>(?<!\\)\*\*(?P<bold_text>.+?)(?<!\\)\*\*)"
     r"|(?P<strike>(?<!\\)~~(?P<strike_text>.+?)(?<!\\)~~)"
     r"|(?P<italic>(?<!\\)(?<!\*)\*(?!\*)(?P<italic_text>.+?)(?<!\\)\*(?!\*))"
 )
 
-_MARK_NAMES = ("code", "underline", "bold", "strike", "italic")
+_MARK_NAMES = ("code", "link", "underline", "bold", "strike", "italic")
 
 
 def _unescape(text: str) -> str:
@@ -67,7 +97,24 @@ def _inline(text: str) -> list[dict[str, Any]]:
         for name in _MARK_NAMES:
             if match.group(name) is None:
                 continue
+
             body = match.group(f"{name}_text")
+
+            if name == "link":
+                href = _unescape(match.group("link_href").strip())
+                text = _unescape(body)
+                if is_safe_url(href):
+                    node = _text_node(text, "link")
+                    node["marks"][0]["attrs"] = {"href": href}
+                    nodes.append(node)
+                else:
+                    # The mark is dropped, the words are kept. Discarding the
+                    # text as well would lose an author's sentence to a URL they
+                    # may not even have written — a second bug on top of the one
+                    # being prevented.
+                    nodes.append(_text_node(text))
+                break
+
             # Not unescaped inside code: a backslash there is a character in the
             # sample, and removing it changes the code.
             nodes.append(_text_node(body if name == "code" else _unescape(body), name))
@@ -190,6 +237,19 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
                     "content": _inline(heading.group(2)),
                 }
             )
+        # Before BULLET_RE, and that ordering is the whole correctness argument:
+        # "- [ ] milk" matches a bullet too, whose text would be "[ ] milk".
+        elif task := TASK_RE.match(line):
+            if list_node is None or list_node["type"] != "taskList":
+                close_list()
+                list_node = {"type": "taskList", "content": []}
+            list_node["content"].append(
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": task.group(1).lower() == "x"},
+                    "content": [_paragraph(task.group(2))],
+                }
+            )
         elif bullet := BULLET_RE.match(line):
             if list_node is None or list_node["type"] != "bulletList":
                 close_list()
@@ -297,7 +357,7 @@ def doc_to_plain_text(doc: dict[str, Any]) -> str:
 # formatting. Kept to exactly what `_unescape` reverses — the two must agree, or
 # a round trip loses characters.
 _INLINE_ESCAPES = str.maketrans(
-    {"\\": "\\\\", "*": "\\*", "`": "\\`", "~": "\\~"}
+    {"\\": "\\\\", "*": "\\*", "`": "\\`", "~": "\\~", "[": "\\[", "]": "\\]"}
 )
 
 # A line beginning with one of these means something to the importer, so a
@@ -327,6 +387,16 @@ def _escape_line_start(line: str) -> str:
         number, _, rest = line.partition(".")
         return f"{number}\\.{rest}"
     return line
+
+
+def _href_of(node: dict[str, Any]) -> str:
+    marks = node.get("marks")
+    for mark in marks if isinstance(marks, list) else []:
+        if isinstance(mark, dict) and mark.get("type") == "link":
+            attrs = mark.get("attrs")
+            if isinstance(attrs, dict):
+                return str(attrs.get("href") or "")
+    return ""
 
 
 def _marks_of(node: dict[str, Any]) -> set[str]:
@@ -367,6 +437,14 @@ def _inline_to_markdown(nodes: Any) -> str:
             continue
 
         text = _escape_inline(raw)
+
+        if "link" in marks:
+            href = _href_of(node)
+            # An unsafe href never survives import, but a document could hold one
+            # from before this rule existed, so it is checked on the way out too.
+            if href and is_safe_url(href):
+                out.append(f"[{text}]({href})")
+                continue
 
         # Innermost first, so **_both_** nests rather than interleaving.
         if "italic" in marks:
@@ -423,6 +501,13 @@ def _blockquote_to_markdown(block: dict[str, Any]) -> str:
     return "\n".join(f"> {line}".rstrip() for line in inner.split("\n"))
 
 
+def _is_checked(item: Any) -> bool:
+    if not isinstance(item, dict):
+        return False
+    attrs = item.get("attrs")
+    return bool(attrs.get("checked")) if isinstance(attrs, dict) else False
+
+
 def _list_item_text(item: Any) -> str:
     """A list item holds a paragraph; the marker is added by the caller."""
     if not isinstance(item, dict):
@@ -477,6 +562,18 @@ def doc_to_markdown(doc: dict[str, Any]) -> str:
 
         elif kind == "horizontalRule":
             chunks.append("---")
+
+        elif kind == "taskList":
+            items = block.get("content")
+            items = items if isinstance(items, list) else []
+            chunks.append(
+                "\n".join(
+                    "- [{}] {}".format(
+                        "x" if _is_checked(item) else " ", _list_item_text(item)
+                    )
+                    for item in items
+                )
+            )
 
         elif kind == "bulletList":
             items = block.get("content")

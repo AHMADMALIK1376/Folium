@@ -2,6 +2,7 @@
 
 import type { Editor } from "@tiptap/react";
 
+import { LinkDialog } from "@/components/editor/LinkDialog";
 import { cn } from "@/lib/utils";
 
 /** One formatting control.
@@ -104,6 +105,7 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       >
         <span className="font-mono text-xs">&lt;&gt;</span>
       </ToolbarButton>
+      <LinkDialog editor={editor} />
 
       <Divider />
 
@@ -170,6 +172,13 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
       >
         1.
+      </ToolbarButton>
+      <ToolbarButton
+        label="Checklist"
+        active={editor.isActive("taskList")}
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+      >
+        ☑
       </ToolbarButton>
     </div>
   );

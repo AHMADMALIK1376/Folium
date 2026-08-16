@@ -37,6 +37,7 @@ share them with other people.
 | [6-iii](docs/superpowers/specs/2026-08-16-phase-6-iii-slash-menu-tables-design.md) | A `/` menu for inserting any block | Done |
 | 6-iv | Tables | Done |
 | [7-i](docs/superpowers/specs/2026-08-16-phase-7-i-search-design.md) | Search across titles and bodies | Done |
+| 7-ii | Combined marks round-trip losslessly | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -155,6 +156,7 @@ what to do with it.
 | Headings | `#`, `##`, `###` |
 | Bold, italic | `**`, `*` |
 | Underline | `<u>` — Markdown has no underline and the editor offers one |
+| Several marks at once | Nested, e.g. `***bold italic***`, `[**a link**](url)` |
 | Strikethrough | `~~` |
 | Inline code | `` ` `` — **contents are never escaped** |
 | Code blocks | fenced, with the language preserved |

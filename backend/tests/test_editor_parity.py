@@ -214,3 +214,98 @@ def test_every_mark_survives_a_round_trip(name):
     assert markdown_to_doc(doc_to_markdown(original)) == original, (
         f"{name} does not survive export and re-import"
     )
+
+
+# --- Combined marks ---
+#
+# The gap that let bold+italic corrupt a document for the life of the project:
+# every test above applies exactly ONE mark, so no combination was ever
+# exercised in either direction. `***important***` came back as the text
+# "*important" carrying only bold — a character lost and a stray asterisk
+# gained, in the author's prose.
+
+COMBINABLE = [name for name in SCHEMA["marks"] if name not in ("code", "link")]
+
+PAIRS = [(a, b) for i, a in enumerate(COMBINABLE) for b in COMBINABLE[i + 1 :]]
+
+
+def _combined(names: tuple[str, ...]) -> dict:
+    return {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "important",
+                        "marks": [{"type": name} for name in names],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+@pytest.mark.parametrize("pair", PAIRS, ids=lambda p: "+".join(p))
+def test_two_marks_together_survive_a_round_trip(pair):
+    """The text and every mark, not one of them.
+
+    Compared as a set: ProseMirror treats a node's marks as unordered, and the
+    converters have no way to know the order the editor happened to store them
+    in. Losing a mark, or leaving syntax stranded in the text, is the failure
+    this catches.
+    """
+    original = _combined(pair)
+    result = markdown_to_doc(doc_to_markdown(original))
+
+    [node] = result["content"][0]["content"]
+
+    assert node["text"] == "important", "syntax was left stranded in the text"
+    assert {m["type"] for m in node.get("marks", [])} == set(pair)
+
+
+def test_three_marks_together_survive_a_round_trip():
+    original = _combined(("bold", "italic", "underline"))
+    [node] = markdown_to_doc(doc_to_markdown(original))["content"][0]["content"]
+
+    assert node["text"] == "important"
+    assert {m["type"] for m in node.get("marks", [])} == {"bold", "italic", "underline"}
+
+
+def test_a_link_can_also_be_bold():
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "the docs",
+                        "marks": [
+                            {"type": "link", "attrs": {"href": "https://example.com"}},
+                            {"type": "bold"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    [node] = markdown_to_doc(doc_to_markdown(original))["content"][0]["content"]
+
+    assert node["text"] == "the docs"
+    assert {m["type"] for m in node.get("marks", [])} == {"link", "bold"}
+
+
+def test_code_is_never_combined_with_emphasis():
+    """Deliberate: a backtick span's content is literal, so `**a**` inside one
+    is code containing asterisks. Bold applied to a code span cannot be
+    expressed in Markdown, and inventing a spelling would break the round trip
+    in the other direction."""
+    original = _combined(("code", "bold"))
+    [node] = markdown_to_doc(doc_to_markdown(original))["content"][0]["content"]
+
+    assert node["text"] == "important"
+    assert {m["type"] for m in node.get("marks", [])} == {"code"}

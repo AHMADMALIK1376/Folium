@@ -308,3 +308,124 @@ def test_a_paragraph_that_looks_like_a_rule_stays_a_paragraph():
     original = doc(paragraph(text("---")))
 
     assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+# --- Phase 6-ii: links and task lists ---
+
+
+def link(text_value: str, href: str) -> dict:
+    return {
+        "type": "text",
+        "text": text_value,
+        "marks": [{"type": "link", "attrs": {"href": href}}],
+    }
+
+
+def task_list(*items) -> dict:
+    return {"type": "taskList", "content": list(items)}
+
+
+def task(text_value: str, checked: bool) -> dict:
+    return {
+        "type": "taskItem",
+        "attrs": {"checked": checked},
+        "content": [paragraph(text(text_value))],
+    }
+
+
+def test_a_link_becomes_markdown():
+    result = doc_to_markdown(doc(paragraph(link("the docs", "https://example.com"))))
+
+    assert result == "[the docs](https://example.com)"
+
+
+def test_a_link_survives_a_round_trip():
+    original = doc(paragraph(link("the docs", "https://example.com")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_a_mailto_link_is_allowed():
+    original = doc(paragraph(link("write to me", "mailto:a@example.com")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_a_relative_link_is_allowed():
+    """No scheme means relative, which cannot execute anything."""
+    original = doc(paragraph(link("about", "/about")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_square_brackets_in_text_survive():
+    original = doc(paragraph(text("an [aside] in brackets")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_square_brackets_inside_code_are_not_escaped():
+    result = doc_to_markdown(doc(paragraph(text("items[0]", "code"))))
+
+    assert "`items[0]`" in result
+    assert r"\[" not in result
+
+
+def test_a_javascript_url_is_refused_on_import():
+    """The security case. A link is the first content type where the author
+    supplies something the READER's browser will act on, and a viewer may only
+    have been given permission to read."""
+    result = markdown_to_doc("[click me](javascript:alert(1))")
+
+    [para] = result["content"]
+    [node] = para["content"]
+    # The words survive; only the mark is dropped. Discarding the sentence would
+    # be a second bug on top of the one being prevented.
+    assert node["text"] == "click me"
+    assert "marks" not in node
+
+
+def test_other_dangerous_schemes_are_refused():
+    for url in ["data:text/html;base64,PHNjcmlwdD4=", "vbscript:msgbox(1)", "JavaScript:alert(1)"]:
+        [para] = markdown_to_doc(f"[x]({url})")["content"]
+        [node] = para["content"]
+        assert "marks" not in node, f"{url} was allowed through"
+
+
+def test_a_task_list_becomes_checkboxes():
+    result = doc_to_markdown(doc(task_list(task("Buy milk", False), task("Call Ana", True))))
+
+    assert result == "- [ ] Buy milk\n- [x] Call Ana"
+
+
+def test_a_task_list_survives_a_round_trip():
+    original = doc(task_list(task("Buy milk", False), task("Call Ana", True)))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_a_task_item_is_not_read_as_a_bullet():
+    """BULLET_RE matches "- [ ] milk" too, whose text would be "[ ] milk" — a
+    checklist quietly demoted to a list. Order is the whole argument."""
+    [block] = markdown_to_doc("- [ ] milk")["content"]
+
+    assert block["type"] == "taskList"
+    assert block["content"][0]["attrs"]["checked"] is False
+
+
+def test_an_uppercase_x_is_checked():
+    [block] = markdown_to_doc("- [X] done")["content"]
+
+    assert block["content"][0]["attrs"]["checked"] is True
+
+
+def test_a_bullet_list_and_a_task_list_stay_separate():
+    content = markdown_to_doc("- plain item\n- [ ] a task")["content"]
+
+    assert [block["type"] for block in content] == ["bulletList", "taskList"]
+
+
+def test_a_paragraph_beginning_with_brackets_is_not_a_task():
+    original = doc(paragraph(text("[ ] not a checkbox")))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original

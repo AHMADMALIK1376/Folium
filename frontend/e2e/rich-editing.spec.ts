@@ -1,0 +1,125 @@
+import { readFileSync } from "node:fs";
+
+import { expect, test, type Page } from "@playwright/test";
+
+/** Links and checklists, through the browser and out the other side. */
+
+function uniqueEmail(role = "rich") {
+  return `e2e-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+}
+
+const PASSWORD = "e2e-password-123";
+
+async function signUp(page: Page, email: string) {
+  await page.goto("/signup");
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/password/i).fill(PASSWORD);
+  await page.getByRole("button", { name: /create account/i }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+}
+
+async function newDocument(page: Page) {
+  await page.getByRole("button", { name: /new document/i }).click();
+  await page.getByRole("link", { name: /untitled document/i }).click();
+  await expect(page).toHaveURL(/\/documents\//);
+  await expect(page.getByRole("toolbar", { name: /formatting/i })).toBeVisible();
+}
+
+async function exportedMarkdown(page: Page): Promise<string> {
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /^export$/i }).click().then(() =>
+      page.getByRole("button", { name: /download as markdown/i }).click(),
+    ),
+  ]);
+
+  return readFileSync(await download.path(), "utf-8");
+}
+
+test("a link survives export", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("link"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("Read the docs");
+  await page.keyboard.press("Shift+Home");
+
+  await page.getByRole("button", { name: "Link" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/address/i).fill("example.com");
+  await dialog.getByRole("button", { name: /add link/i }).click();
+  await expect(dialog).toBeHidden();
+
+  // Asserted in the document before exporting, deliberately. Without this a
+  // failure downstream cannot distinguish "the link was never applied" from
+  // "export dropped it" — and the first time this ran it was the former.
+  // https:// is added for a bare domain, which is what people type.
+  await expect(page.locator('a[href="https://example.com"]')).toHaveCount(1);
+
+  expect(await exportedMarkdown(page)).toContain("[Read the docs](https://example.com)");
+});
+
+test("a checklist survives export", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("task"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.getByRole("button", { name: /checklist/i }).click();
+  await page.keyboard.type("Buy milk");
+
+  await expect(page.getByRole("checkbox")).toHaveCount(1);
+
+  expect(await exportedMarkdown(page)).toContain("- [ ] Buy milk");
+});
+
+test("a checked box survives a reload", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("check"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.getByRole("button", { name: /checklist/i }).click();
+  await page.keyboard.type("Call Ana");
+
+  const box = page.getByRole("checkbox").first();
+  await box.check();
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  await page.reload();
+
+  // The state, not merely the item: `checked` is an attribute on the node, and
+  // an autosave that dropped it would still show the text.
+  await expect(page.getByRole("checkbox").first()).toBeChecked();
+  await expect(page.getByText("Call Ana")).toBeVisible();
+});
+
+test("a script URL is refused by the editor", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("xss"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("click me");
+  await page.keyboard.press("Shift+Home");
+
+  await page.getByRole("button", { name: "Link" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/address/i).fill("javascript:alert(1)");
+  await dialog.getByRole("button", { name: /add link/i }).click();
+
+  // Scoped to the dialog: Next.js renders its own role="alert" route announcer,
+  // so an unscoped query matches two elements and fails strict mode.
+  await expect(dialog.getByRole("alert")).toContainText(/cannot be used/i);
+  await expect(dialog).toBeVisible();
+
+  // And nothing was applied — the words are still plain text.
+  await expect(page.locator('a[href^="javascript"]')).toHaveCount(0);
+});

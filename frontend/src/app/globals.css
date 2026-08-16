@@ -162,6 +162,11 @@
    and StarterKit is configured to produce nothing else. Scoped to
    .folium-prose so it can never restyle the app around the editor. */
 .folium-prose {
+  /* A reading measure, independent of the shell's width. The app container is
+     deliberately wide now, and without this a document on a large monitor would
+     run to 1500px lines — technically more space, considerably harder to read. */
+  max-width: 78ch;
+  margin-inline: auto;
   color: var(--color-neutral-900);
   font-size: 1rem;
   line-height: 1.7;
@@ -187,9 +192,39 @@
   margin-top: 1.4em;
 }
 
+.folium-prose h3 {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 1.3em;
+}
+
 .folium-prose h1:first-child,
-.folium-prose h2:first-child {
+.folium-prose h2:first-child,
+.folium-prose h3:first-child {
   margin-top: 0;
+}
+
+/* Marks Markdown cannot express, which travel as HTML tags. Without these the
+   editor shows them unstyled and the author cannot tell they applied. */
+.folium-prose mark {
+  background: #fef08a;
+  padding: 0 0.1em;
+}
+
+.folium-prose sub,
+.folium-prose sup {
+  font-size: 0.75em;
+  line-height: 0;
+}
+
+.folium-prose sup {
+  vertical-align: super;
+}
+
+.folium-prose sub {
+  vertical-align: sub;
 }
 
 .folium-prose ul,
@@ -323,7 +358,8 @@
   /* A heading stranded at the foot of a page, or a list item split across two,
      is the difference between a printout and a document. */
   .folium-prose h1,
-  .folium-prose h2 {
+  .folium-prose h2,
+  .folium-prose h3 {
     break-after: avoid;
     page-break-after: avoid;
   }

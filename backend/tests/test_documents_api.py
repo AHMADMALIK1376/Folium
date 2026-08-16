@@ -22,7 +22,10 @@ async def test_create_document(client: AsyncClient, alice):
     body = response.json()
     assert body["title"] == "My doc"
     assert body["permission"] == "owner"
-    assert body["content"] == {"type": "doc", "content": [{"type": "paragraph"}]}
+    assert body["content"] == {
+        "type": "doc",
+        "content": [{"type": "paragraph", "attrs": {"textAlign": None}}],
+    }
 
 
 async def test_create_rejects_blank_title(client: AsyncClient, alice):

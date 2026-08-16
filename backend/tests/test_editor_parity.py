@@ -25,12 +25,13 @@ from app.utils.import_file import doc_to_markdown, markdown_to_doc
 
 SCHEMA = json.loads((Path(__file__).resolve().parents[2] / "editor-schema.json").read_text("utf-8"))
 EXCLUDED = SCHEMA["excluded"]
+LOSSY = SCHEMA["lossy"]
 
 NODE_SAMPLES: dict[str, dict] = {
-    "paragraph": {"type": "paragraph", "content": [{"type": "text", "text": "Body"}]},
+    "paragraph": {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Body"}]},
     "heading": {
         "type": "heading",
-        "attrs": {"level": 2},
+        "attrs": {"level": 2, "textAlign": None},
         "content": [{"type": "text", "text": "Title"}],
     },
     "bulletList": {
@@ -39,7 +40,7 @@ NODE_SAMPLES: dict[str, dict] = {
             {
                 "type": "listItem",
                 "content": [
-                    {"type": "paragraph", "content": [{"type": "text", "text": "Item"}]}
+                    {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Item"}]}
                 ],
             }
         ],
@@ -50,14 +51,14 @@ NODE_SAMPLES: dict[str, dict] = {
             {
                 "type": "listItem",
                 "content": [
-                    {"type": "paragraph", "content": [{"type": "text", "text": "Item"}]}
+                    {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Item"}]}
                 ],
             }
         ],
     },
     "blockquote": {
         "type": "blockquote",
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Quoted"}]}],
+        "content": [{"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Quoted"}]}],
     },
     # `attrs` is not decoration: TipTap's codeBlock always carries a language
     # attribute, null when unset, so a sample without one is not a document the
@@ -70,6 +71,7 @@ NODE_SAMPLES: dict[str, dict] = {
     "horizontalRule": {"type": "horizontalRule"},
     "hardBreak": {
         "type": "paragraph",
+        "attrs": {"textAlign": None},
         "content": [
             {"type": "text", "text": "one"},
             {"type": "hardBreak"},
@@ -86,14 +88,14 @@ NODE_SAMPLES: dict[str, dict] = {
                         "type": "tableHeader",
                         "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "Name"}]}
+                            {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Name"}]}
                         ],
                     },
                     {
                         "type": "tableHeader",
                         "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "Role"}]}
+                            {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Role"}]}
                         ],
                     },
                 ],
@@ -105,14 +107,14 @@ NODE_SAMPLES: dict[str, dict] = {
                         "type": "tableCell",
                         "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "Ana"}]}
+                            {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Ana"}]}
                         ],
                     },
                     {
                         "type": "tableCell",
                         "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
                         "content": [
-                            {"type": "paragraph", "content": [{"type": "text", "text": "Lead"}]}
+                            {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Lead"}]}
                         ],
                     },
                 ],
@@ -126,14 +128,14 @@ NODE_SAMPLES: dict[str, dict] = {
                 "type": "taskItem",
                 "attrs": {"checked": False},
                 "content": [
-                    {"type": "paragraph", "content": [{"type": "text", "text": "Buy milk"}]}
+                    {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Buy milk"}]}
                 ],
             },
             {
                 "type": "taskItem",
                 "attrs": {"checked": True},
                 "content": [
-                    {"type": "paragraph", "content": [{"type": "text", "text": "Done already"}]}
+                    {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Done already"}]}
                 ],
             },
         ],
@@ -146,6 +148,7 @@ def _marked(name: str, attrs: dict | None = None) -> dict:
         mark["attrs"] = attrs
     return {
         "type": "paragraph",
+        "attrs": {"textAlign": None},
         "content": [{"type": "text", "text": "marked", "marks": [mark]}],
     }
 
@@ -182,7 +185,7 @@ def test_every_node_is_converted_or_explicitly_excluded(name):
 
 @pytest.mark.parametrize("name", SCHEMA["marks"])
 def test_every_mark_survives_export(name):
-    if not _convertible(name):
+    if not _convertible(name) or name in LOSSY:
         return
 
     result = doc_to_markdown({"type": "doc", "content": [MARK_SAMPLES[name]]})
@@ -207,7 +210,7 @@ def test_every_node_survives_a_round_trip(name):
     )
 
 
-@pytest.mark.parametrize("name", SCHEMA["marks"])
+@pytest.mark.parametrize("name", [m for m in SCHEMA["marks"] if m not in LOSSY])
 def test_every_mark_survives_a_round_trip(name):
     original = {"type": "doc", "content": [MARK_SAMPLES[name]]}
 
@@ -224,7 +227,9 @@ def test_every_mark_survives_a_round_trip(name):
 # "*important" carrying only bold — a character lost and a stray asterisk
 # gained, in the author's prose.
 
-COMBINABLE = [name for name in SCHEMA["marks"] if name not in ("code", "link")]
+COMBINABLE = [
+    name for name in SCHEMA["marks"] if name not in ("code", "link") and name not in LOSSY
+]
 
 PAIRS = [(a, b) for i, a in enumerate(COMBINABLE) for b in COMBINABLE[i + 1 :]]
 
@@ -235,6 +240,7 @@ def _combined(names: tuple[str, ...]) -> dict:
         "content": [
             {
                 "type": "paragraph",
+                "attrs": {"textAlign": None},
                 "content": [
                     {
                         "type": "text",
@@ -279,6 +285,7 @@ def test_a_link_can_also_be_bold():
         "content": [
             {
                 "type": "paragraph",
+                "attrs": {"textAlign": None},
                 "content": [
                     {
                         "type": "text",
@@ -309,3 +316,70 @@ def test_code_is_never_combined_with_emphasis():
 
     assert node["text"] == "important"
     assert {m["type"] for m in node.get("marks", [])} == {"code"}
+
+
+# --- Formatting Markdown cannot carry ---
+#
+# Phase 9 changed the policy: colour, font and alignment are supported in the
+# editor and accepted as lost on Markdown export, because Markdown has no
+# spelling for any of them and TipTap JSON is the record of truth.
+#
+# The promise is therefore different, not absent. These must drop CLEANLY — the
+# author's words survive, only the formatting goes. Silently mangling the text
+# is the bug shape that bit three times in Phase 6, and it is what these catch.
+
+
+@pytest.mark.parametrize("name", sorted(LOSSY))
+def test_lossy_formatting_is_named_with_a_reason(name):
+    assert LOSSY[name], f"{name} is listed as lossy but gives no reason"
+
+
+def test_a_coloured_run_keeps_its_words():
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "important",
+                        "marks": [
+                            {"type": "textStyle", "attrs": {"color": "#d41f26"}},
+                            {"type": "bold"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    exported = doc_to_markdown(original)
+    [node] = markdown_to_doc(exported)["content"][0]["content"]
+
+    # The colour is gone, which is the accepted trade.
+    assert not any(m["type"] == "textStyle" for m in node.get("marks", []))
+    # The words and every mark Markdown CAN carry are not.
+    assert node["text"] == "important"
+    assert {m["type"] for m in node.get("marks", [])} == {"bold"}
+    assert "textStyle" not in exported and "color" not in exported
+
+
+def test_an_aligned_paragraph_keeps_its_words():
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": "center"},
+                "content": [{"type": "text", "text": "centred text"}],
+            }
+        ],
+    }
+
+    result = markdown_to_doc(doc_to_markdown(original))
+
+    assert result["content"][0]["content"][0]["text"] == "centred text"
+    # Back to the default, not carrying a bogus value through.
+    assert result["content"][0]["attrs"]["textAlign"] is None

@@ -38,6 +38,8 @@ share them with other people.
 | 6-iv | Tables | Done |
 | [7-i](docs/superpowers/specs/2026-08-16-phase-7-i-search-design.md) | Search across titles and bodies | Done |
 | 7-ii | Combined marks round-trip losslessly | Done |
+| 8 | A sidebar, and starred documents | Done |
+| 9 | Colour, fonts and alignment — with export stated as lossy | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -72,6 +74,8 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
   type — when a collaboration server is configured.
 - Browse a document's version history, preview an earlier draft, and restore it.
 - Search your documents by any word in a title or a body, including ones shared with you.
+- Star any document you can see — including one shared with you — and reach it from the sidebar.
+  Stars are private: starring a shared document does not star it for everyone.
 - Delete a document and restore it from the trash.
 - Everything persists and survives a refresh or a server restart.
 
@@ -157,6 +161,7 @@ what to do with it.
 | Bold, italic | `**`, `*` |
 | Underline | `<u>` — Markdown has no underline and the editor offers one |
 | Several marks at once | Nested, e.g. `***bold italic***`, `[**a link**](url)` |
+| Highlight, sub/superscript | `<mark>`, `<sub>`, `<sup>` |
 | Strikethrough | `~~` |
 | Inline code | `` ` `` — **contents are never escaped** |
 | Code blocks | fenced, with the language preserved |
@@ -365,10 +370,11 @@ DEPLOY.md               deployment guide
 - **A table cell holds inline text only.** GFM cannot express a list inside a cell, so cell content is
   flattened on export. This is the one place the converters knowingly lose structure, and it is why
   tables took their own phase rather than riding along with links.
-- **Text colour, fonts, and text alignment outside tables are deliberately absent.** Markdown cannot
-  express them, so adding them would mean emitting HTML the importer would have to parse, or giving up
-  the lossless round trip. Column alignment *is* supported, and the distinction is exactly that: GFM
-  can carry `:---:` and has no way at all to say "this paragraph is centred".
+- **Colour, fonts and text alignment do not survive Markdown export.** They are supported in the
+  editor, and Markdown has no spelling for any of them — so the `.md` file omits them. This is a
+  deliberate trade rather than a bug, and the export dialog says so **before** you press the button;
+  **PDF keeps everything**, because it is the browser rendering what is on screen. The formatting is
+  never lost from the document itself: TipTap JSON is the record of truth.
 - **PDF export is the browser's print dialog**, so the browser chooses the filename and the output
   varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address

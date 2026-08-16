@@ -55,8 +55,13 @@ describe("EditorToolbar", () => {
       "Strikethrough",
       "Inline code",
       "Link",
+      "Highlight",
+      "Subscript",
+      "Superscript",
+      "Clear formatting",
       "Heading 1",
       "Heading 2",
+      "Heading 3",
       "Paragraph",
       "Quote",
       "Code block",
@@ -76,6 +81,10 @@ describe("EditorToolbar", () => {
     ["Code block", "toggleCodeBlock"],
     ["Divider", "setHorizontalRule"],
     ["Checklist", "toggleTaskList"],
+    ["Highlight", "toggleHighlight"],
+    ["Subscript", "toggleSubscript"],
+    ["Superscript", "toggleSuperscript"],
+    ["Clear formatting", "unsetAllMarks"],
   ])("%s runs %s", async (label, command) => {
     const { editor, called } = makeEditor();
     render(<EditorToolbar editor={editor as never} />);

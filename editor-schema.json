@@ -15,7 +15,19 @@
     "",
     "Phase 6-i exists because that loop did not: StarterKit enabled blockquote and",
     "codeBlock from the beginning, the converter skipped unknown blocks silently,",
-    "and a document made of a quote exported as an empty file."
+    "and a document made of a quote exported as an empty file.",
+    "",
+    "`lossy` records formatting the editor supports that Markdown CANNOT carry.",
+    "This is a deliberate policy change, not an oversight: TipTap JSON is the",
+    "storage format and the record of truth, Markdown is one export among",
+    "several, and requiring Markdown parity capped the editor at what Markdown",
+    "can express. Colour, fonts and alignment have no Markdown spelling.",
+    "",
+    "What must never happen is losing them SILENTLY, which is the exact bug",
+    "shape that bit three times in Phase 6. So: the export dialog warns before",
+    "writing a .md file that omits them, PDF export keeps all of it, and",
+    "test_editor_parity.py asserts each drops CLEANLY \u2014 the text survives and",
+    "only the formatting goes."
   ],
   "nodes": [
     "blockquote",
@@ -36,7 +48,18 @@
     "taskList",
     "text"
   ],
-  "marks": ["bold", "code", "italic", "link", "strike", "underline"],
+  "marks": [
+    "bold",
+    "code",
+    "highlight",
+    "italic",
+    "link",
+    "strike",
+    "subscript",
+    "superscript",
+    "textStyle",
+    "underline"
+  ],
   "excluded": {
     "doc": "The document root itself, not content within it.",
     "text": "Carries the characters every other rule renders; not a block or a mark.",
@@ -45,5 +68,9 @@
     "tableRow": "Rendered by its parent table, never on its own.",
     "tableCell": "Rendered by its parent tableRow, never on its own.",
     "tableHeader": "Rendered by its parent tableRow, never on its own."
+  },
+  "lossy": {
+    "textStyle": "Colour and font family. Markdown has no spelling for either.",
+    "textAlign": "An attribute on heading and paragraph. Markdown cannot express alignment at all."
   }
 }

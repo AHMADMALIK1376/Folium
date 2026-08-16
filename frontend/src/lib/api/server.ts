@@ -73,3 +73,8 @@ export function getTrash(): Promise<DocumentSummary[]> {
 export function getDocument(id: string): Promise<DocumentDetail> {
   return serverApiFetch<DocumentDetail>(`/api/v1/documents/${id}`);
 }
+
+/** This person's starred documents, most recently starred first. */
+export function getStarred(): Promise<DocumentSummary[]> {
+  return serverApiFetch<DocumentSummary[]>("/api/v1/documents/starred");
+}

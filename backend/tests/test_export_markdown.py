@@ -20,15 +20,18 @@ def text(value: str, mark: str | None = None) -> dict:
 
 
 def paragraph(*children) -> dict:
-    return {"type": "paragraph", "content": list(children)}
+    # attrs, because TipTap's TextAlign extension is configured for paragraphs
+    # and ProseMirror serialises an attribute even at its default. A fixture
+    # without it is not a document the editor could produce.
+    return {"type": "paragraph", "attrs": {"textAlign": None}, "content": list(children)}
 
 
 def test_headings_use_one_hash_per_level():
     result = doc_to_markdown(
         doc(
-            {"type": "heading", "attrs": {"level": 1}, "content": [text("One")]},
-            {"type": "heading", "attrs": {"level": 2}, "content": [text("Two")]},
-            {"type": "heading", "attrs": {"level": 3}, "content": [text("Three")]},
+            {"type": "heading", "attrs": {"level": 1, "textAlign": None}, "content": [text("One")]},
+            {"type": "heading", "attrs": {"level": 2, "textAlign": None}, "content": [text("Two")]},
+            {"type": "heading", "attrs": {"level": 3, "textAlign": None}, "content": [text("Three")]},
         )
     )
 

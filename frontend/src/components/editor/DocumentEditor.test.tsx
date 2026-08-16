@@ -45,6 +45,9 @@ const setEditable = vi.fn();
 vi.mock("@tiptap/react", () => ({
   useEditor: (options: { editable: boolean }) => ((editorOptions = options), {
     isActive: () => false,
+    // FormattingControls reads the current colour and font from here; a mock
+    // without it throws and takes every test in this file down with it.
+    getAttributes: () => ({}),
     setEditable,
     getJSON: () => ({ type: "doc", content: [] }),
     chain: () => ({

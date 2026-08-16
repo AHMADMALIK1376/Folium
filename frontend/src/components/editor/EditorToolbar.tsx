@@ -105,7 +105,37 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       >
         <span className="font-mono text-xs">&lt;&gt;</span>
       </ToolbarButton>
+      <ToolbarButton
+        label="Highlight"
+        active={editor.isActive("highlight")}
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+      >
+        <span className="bg-amber-200 px-0.5">H</span>
+      </ToolbarButton>
+      <ToolbarButton
+        label="Subscript"
+        active={editor.isActive("subscript")}
+        onClick={() => editor.chain().focus().toggleSubscript().run()}
+      >
+        x<sub className="text-[0.7em]">2</sub>
+      </ToolbarButton>
+      <ToolbarButton
+        label="Superscript"
+        active={editor.isActive("superscript")}
+        onClick={() => editor.chain().focus().toggleSuperscript().run()}
+      >
+        x<sup className="text-[0.7em]">2</sup>
+      </ToolbarButton>
       <LinkDialog editor={editor} />
+      <ToolbarButton
+        // Not a toggle, so aria-pressed stays false rather than lying about a
+        // state this control does not have.
+        label="Clear formatting"
+        active={false}
+        onClick={() => editor.chain().focus().unsetAllMarks().run()}
+      >
+        <span className="text-xs">A&#x0338;</span>
+      </ToolbarButton>
 
       <Divider />
 
@@ -122,6 +152,13 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
       >
         H2
+      </ToolbarButton>
+      <ToolbarButton
+        label="Heading 3"
+        active={editor.isActive("heading", { level: 3 })}
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+      >
+        H3
       </ToolbarButton>
       <ToolbarButton
         label="Paragraph"

@@ -30,6 +30,16 @@ DELIMITER_RE = re.compile(r"^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$")
 # collaborative editor, which is the worst shape it comes in.
 ALLOWED_PROTOCOLS = ("http", "https", "mailto")
 
+# TipTap's TextAlign extension is configured for heading and paragraph, and
+# ProseMirror serialises an attribute even when it holds its default — so every
+# paragraph the editor produces carries {"textAlign": null}. A node built here
+# without it is not a document the editor could have made, and would fail to
+# compare equal on a round trip.
+#
+# Alignment itself is deliberately LOSSY on export: Markdown cannot express it.
+# See `lossy` in editor-schema.json.
+ALIGNABLE_ATTRS: dict[str, Any] = {"textAlign": None}
+
 _SCHEME_RE = re.compile(r"^([a-zA-Z][a-zA-Z0-9+.-]*):")
 
 
@@ -61,6 +71,9 @@ _INLINE_PATTERN = re.compile(
     r"(?P<code>(?<!\\)`(?P<code_text>[^`]+)`)"
     r"|(?P<link>(?<!\\)\[(?P<link_text>[^\]]*)\]\((?P<link_href>[^)]*)\))"
     r"|(?P<underline><u>(?P<underline_text>.+?)</u>)"
+    r"|(?P<highlight><mark>(?P<highlight_text>.+?)</mark>)"
+    r"|(?P<subscript><sub>(?P<subscript_text>.+?)</sub>)"
+    r"|(?P<superscript><sup>(?P<superscript_text>.+?)</sup>)"
     # Before bold, and it has to be its own alternative rather than falling out
     # of bold-then-italic. On "***x***" the bold pattern's non-greedy body stops
     # at the first "**" it can, capturing "*x" and stranding the closing
@@ -71,7 +84,18 @@ _INLINE_PATTERN = re.compile(
     r"|(?P<italic>(?<!\\)(?<!\*)\*(?!\*)(?P<italic_text>.+?)(?<!\\)\*(?!\*))"
 )
 
-_MARK_NAMES = ("code", "link", "underline", "bolditalic", "bold", "strike", "italic")
+_MARK_NAMES = (
+    "code",
+    "link",
+    "underline",
+    "highlight",
+    "subscript",
+    "superscript",
+    "bolditalic",
+    "bold",
+    "strike",
+    "italic",
+)
 
 
 def _unescape(text: str) -> str:
@@ -231,7 +255,10 @@ def _paragraph_from_lines(lines: list[str]) -> dict[str, Any]:
             content.append({"type": "hardBreak"})
         content.extend(_inline(line))
 
-    return {"type": "paragraph", "content": content} if content else {"type": "paragraph"}
+    node: dict[str, Any] = {"type": "paragraph", "attrs": dict(ALIGNABLE_ATTRS)}
+    if content:
+        node["content"] = content
+    return node
 
 
 def _paragraph(text: str) -> dict[str, Any]:
@@ -241,7 +268,10 @@ def _paragraph(text: str) -> dict[str, Any]:
     `content` entirely rather than carrying a zero-length text node.
     """
     content = _inline(text)
-    return {"type": "paragraph", "content": content} if content else {"type": "paragraph"}
+    node: dict[str, Any] = {"type": "paragraph", "attrs": dict(ALIGNABLE_ATTRS)}
+    if content:
+        node["content"] = content
+    return node
 
 
 def _list_item(text: str) -> dict[str, Any]:
@@ -359,7 +389,10 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
             content.append(
                 {
                     "type": "heading",
-                    "attrs": {"level": len(heading.group(1))},
+                    "attrs": {
+                        "level": len(heading.group(1)),
+                        **ALIGNABLE_ATTRS,
+                    },
                     "content": _inline(heading.group(2)),
                 }
             )
@@ -578,6 +611,15 @@ def _inline_to_markdown(nodes: Any) -> str:
         # it would silently lose something the author deliberately applied.
         if "underline" in marks:
             text = f"<u>{text}</u>"
+        # Markdown has no spelling for any of these three either. <mark>, <sub>
+        # and <sup> are HTML every common renderer accepts, and the importer
+        # reads them straight back.
+        if "highlight" in marks:
+            text = f"<mark>{text}</mark>"
+        if "subscript" in marks:
+            text = f"<sub>{text}</sub>"
+        if "superscript" in marks:
+            text = f"<sup>{text}</sup>"
 
         # Outermost, and applied last rather than returning early — a link may
         # also be bold, and short-circuiting here dropped every other mark on it.

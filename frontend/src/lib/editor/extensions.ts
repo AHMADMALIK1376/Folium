@@ -1,5 +1,12 @@
+import Color from "@tiptap/extension-color";
+import FontFamily from "@tiptap/extension-font-family";
+import Highlight from "@tiptap/extension-highlight";
 import Link from "@tiptap/extension-link";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
 import Table from "@tiptap/extension-table";
+import TextAlign from "@tiptap/extension-text-align";
+import TextStyle from "@tiptap/extension-text-style";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TableRow from "@tiptap/extension-table-row";
@@ -55,6 +62,14 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
         target: "_blank",
       },
     }),
+    // Markdown has no spelling for these three, so they travel as HTML tags —
+    // the same exception underline has had since Phase 5-i, and for the same
+    // reason: the editor offers them, and dropping them on export would lose
+    // something the author deliberately applied. <mark>, <sub> and <sup> are
+    // understood by every renderer that matters.
+    Highlight,
+    Subscript,
+    Superscript,
     TaskList,
     // Nesting is out of scope this phase, and the Markdown converters would have
     // to learn indentation to carry it.
@@ -68,5 +83,30 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     TableRow,
     TableHeader,
     TableCell,
+    // --- Formatting Markdown cannot carry ---
+    //
+    // Deliberately accepted as LOSSY on Markdown export, which is a change of
+    // policy rather than an oversight. Everything above round-trips exactly;
+    // these do not, because Markdown has no way to say "this is red" or "this
+    // paragraph is centred" and inventing HTML for it would mean the importer
+    // needing a real HTML parser.
+    //
+    // The trade was made openly: TipTap JSON is the storage format and the
+    // record of truth, Markdown is one export among several, and requiring
+    // Markdown parity capped the editor at what Markdown can express. What must
+    // never happen is losing it SILENTLY — so `editor-schema.json` lists these
+    // as `lossy`, a test asserts they drop cleanly rather than corrupting text,
+    // and the export dialog warns before writing a .md file that omits them.
+    //
+    // PDF export keeps all of it, because that is the browser rendering what is
+    // on screen.
+    TextStyle,
+    Color,
+    FontFamily,
+    TextAlign.configure({
+      // Headings and paragraphs only. Alignment on a list item or a table cell
+      // is a different question with its own answers, and this is wide enough.
+      types: ["heading", "paragraph"],
+    }),
   ];
 }

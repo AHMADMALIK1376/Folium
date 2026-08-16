@@ -10,7 +10,11 @@ def test_paragraph():
     assert markdown_to_doc("hello world") == {
         "type": "doc",
         "content": [
-            {"type": "paragraph", "content": [{"type": "text", "text": "hello world"}]}
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [{"type": "text", "text": "hello world"}],
+            }
         ],
     }
 
@@ -44,7 +48,13 @@ def test_bullet_list_groups_consecutive_items():
     assert len(node["content"]) == 2
     assert node["content"][0] == {
         "type": "listItem",
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "one"}]}],
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [{"type": "text", "text": "one"}],
+            }
+        ],
     }
 
 
@@ -65,7 +75,10 @@ def test_html_in_source_is_literal_text_not_markup():
 
 
 def test_empty_markdown_yields_empty_paragraph():
-    assert markdown_to_doc("") == {"type": "doc", "content": [{"type": "paragraph"}]}
+    assert markdown_to_doc("") == {
+        "type": "doc",
+        "content": [{"type": "paragraph", "attrs": {"textAlign": None}}],
+    }
 
 
 def test_plain_text_splits_paragraphs_on_blank_lines():
@@ -81,7 +94,10 @@ def test_plain_text_keeps_single_newlines_as_hard_breaks():
 
 
 def test_plain_text_empty_yields_empty_paragraph():
-    assert plain_text_to_doc("   ") == {"type": "doc", "content": [{"type": "paragraph"}]}
+    assert plain_text_to_doc("   ") == {
+        "type": "doc",
+        "content": [{"type": "paragraph", "attrs": {"textAlign": None}}],
+    }
 
 
 def test_title_from_filename_strips_extension_and_separators():

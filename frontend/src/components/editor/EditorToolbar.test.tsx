@@ -54,6 +54,7 @@ describe("EditorToolbar", () => {
       "Underline",
       "Strikethrough",
       "Inline code",
+      "Link",
       "Heading 1",
       "Heading 2",
       "Paragraph",
@@ -62,6 +63,7 @@ describe("EditorToolbar", () => {
       "Divider",
       "Bulleted list",
       "Numbered list",
+      "Checklist",
     ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
@@ -73,6 +75,7 @@ describe("EditorToolbar", () => {
     ["Quote", "toggleBlockquote"],
     ["Code block", "toggleCodeBlock"],
     ["Divider", "setHorizontalRule"],
+    ["Checklist", "toggleTaskList"],
   ])("%s runs %s", async (label, command) => {
     const { editor, called } = makeEditor();
     render(<EditorToolbar editor={editor as never} />);

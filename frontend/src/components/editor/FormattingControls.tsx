@@ -48,7 +48,7 @@ function Select({
   onChange: (value: string | null) => void;
 }) {
   return (
-    <label className="flex items-center">
+    <label className="flex shrink-0 items-center">
       <span className="sr-only">{label}</span>
       <select
         aria-label={label}
@@ -82,7 +82,7 @@ export function FormattingControls({ editor }: { editor: Editor }) {
       role="toolbar"
       aria-label="Text style"
       data-print-hide
-      className="flex flex-wrap items-center gap-2 border-b border-neutral-200 px-2 py-1.5"
+      className="flex items-center gap-2 overflow-x-auto border-b border-neutral-200 px-2 py-1.5 [scrollbar-width:thin] sm:flex-wrap sm:overflow-x-visible"
     >
       <Select
         label="Text colour"
@@ -117,7 +117,7 @@ export function FormattingControls({ editor }: { editor: Editor }) {
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => editor.chain().focus().setTextAlign(alignment.value).run()}
           className={
-            "flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-sm transition-colors " +
+            "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md px-1.5 text-sm transition-colors " +
             "hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-carmine-500 focus-visible:outline-none " +
             (editor.isActive({ textAlign: alignment.value })
               ? "bg-neutral-100 font-semibold text-carmine-700"

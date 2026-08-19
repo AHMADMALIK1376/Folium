@@ -40,6 +40,8 @@ share them with other people.
 | 7-ii | Combined marks round-trip losslessly | Done |
 | 8 | A sidebar, and starred documents | Done |
 | 9 | Colour, fonts and alignment — with export stated as lossy | Done |
+| [10](docs/superpowers/specs/2026-08-17-phase-10-version-diff-design.md) | See what changed between versions | Done |
+| 11 | Faster authenticated requests, and a phone-usable editor | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -72,7 +74,8 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
   dashboard separates documents you own from documents shared with you.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
   type — when a collaboration server is configured.
-- Browse a document's version history, preview an earlier draft, and restore it.
+- Browse a document's version history, preview an earlier draft, **see exactly what changed**, and
+  restore it.
 - Search your documents by any word in a title or a body, including ones shared with you.
 - Star any document you can see — including one shared with you — and reach it from the sidebar.
   Stars are private: starring a shared document does not star it for everyone.

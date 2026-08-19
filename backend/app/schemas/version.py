@@ -24,3 +24,27 @@ class VersionSummary(BaseModel):
 
 class VersionDetail(VersionSummary):
     content: dict[str, Any]
+
+
+class DiffSegment(BaseModel):
+    """One run of text, and what happened to it.
+
+    Runs of the same kind are merged by the service, so a client renders one
+    span per change rather than one per word.
+    """
+
+    op: str  # "equal" | "added" | "removed"
+    text: str
+
+
+class VersionDiff(BaseModel):
+    """What changed between a version and the document as it stands.
+
+    The counts come first because they answer the question most of the time —
+    "12 words added, 4 removed" is usually the whole answer, and the segments
+    are for when it is not.
+    """
+
+    added: int
+    removed: int
+    segments: list[DiffSegment]

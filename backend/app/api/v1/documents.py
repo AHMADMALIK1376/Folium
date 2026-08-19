@@ -5,6 +5,7 @@ from fastapi import APIRouter, Response, status
 from app.api.deps import CurrentUser, DbSession
 from app.schemas.document import (
     DocumentCreate,
+    DocumentListItem,
     DocumentListOut,
     DocumentOut,
     DocumentSummary,
@@ -12,6 +13,7 @@ from app.schemas.document import (
 )
 from app.schemas.user import UserOut
 from app.services import documents as service
+from app.services import stars as stars_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -33,9 +35,23 @@ async def _to_out(db: DbSession, document, permission: str) -> DocumentOut:
 @router.get("", response_model=DocumentListOut)
 async def list_documents(db: DbSession, user: CurrentUser) -> DocumentListOut:
     owned, shared = await service.list_documents(db, user.id)
+
+    # One query for the whole page rather than one per row, and one request
+    # rather than two: the dashboard previously fetched stars separately, which
+    # cost it a second authenticated round trip.
+    starred = await stars_service.starred_ids(
+        db, user.id, [d.id for d in owned] + [d.id for d in shared]
+    )
+
+    def item(document) -> DocumentListItem:
+        return DocumentListItem(
+            **DocumentSummary.model_validate(document).model_dump(),
+            starred=document.id in starred,
+        )
+
     return DocumentListOut(
-        owned=[DocumentSummary.model_validate(d) for d in owned],
-        shared=[DocumentSummary.model_validate(d) for d in shared],
+        owned=[item(d) for d in owned],
+        shared=[item(d) for d in shared],
     )
 
 

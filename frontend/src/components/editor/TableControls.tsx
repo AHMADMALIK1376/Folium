@@ -28,7 +28,7 @@ export function TableControls({ editor }: { editor: Editor }) {
       role="toolbar"
       aria-label="Table"
       data-print-hide
-      className="flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-neutral-50 px-2 py-1.5"
+      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-200 bg-neutral-50 px-2 py-1.5 [scrollbar-width:thin] sm:flex-wrap sm:overflow-x-visible"
     >
       <span className="px-1 text-xs font-medium text-neutral-500">Table</span>
       {actions.map(([label, run]) => (
@@ -36,6 +36,7 @@ export function TableControls({ editor }: { editor: Editor }) {
           key={label}
           variant="outline"
           size="sm"
+          className="shrink-0"
           // Keeps the caret in the cell being operated on; without it the click
           // moves focus and the command applies to nothing.
           onMouseDown={(event) => event.preventDefault()}

@@ -35,7 +35,7 @@ function ToolbarButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       className={cn(
-        "flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-sm transition-colors",
+        "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md px-1.5 text-sm transition-colors",
         "hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-carmine-500 focus-visible:outline-none",
         active ? "bg-neutral-100 font-semibold text-carmine-700" : "text-neutral-600",
       )}
@@ -68,7 +68,10 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex flex-wrap items-center gap-1 border-b border-neutral-200 px-2 py-1.5"
+      /* On a phone, twenty controls wrap into three rows and push the document
+         off screen. One horizontally scrollable row keeps every control
+         reachable and the document visible; wrapping returns at sm. */
+      className="flex items-center gap-1 overflow-x-auto border-b border-neutral-200 px-2 py-1.5 [scrollbar-width:thin] sm:flex-wrap sm:overflow-x-visible"
     >
       <ToolbarButton
         label="Bold"

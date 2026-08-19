@@ -10,6 +10,7 @@ import type {
   Share,
   TipTapDoc,
   VersionDetail,
+  VersionDiff,
   VersionSummary,
 } from "./types";
 
@@ -112,6 +113,17 @@ export function listVersions(id: string): Promise<VersionSummary[]> {
 /** One version, with its content, for previewing before restoring. */
 export function getVersion(id: string, versionId: string): Promise<VersionDetail> {
   return apiFetch<VersionDetail>(`/api/v1/documents/${id}/versions/${versionId}`);
+}
+
+/** What changed between a version and the document as it stands.
+ *
+ * Follows view permission, like the rest of history. A 422 means the pair is
+ * too large to compare — the backend refuses rather than hanging on a
+ * comparison that is quadratic in the worst case. */
+export function diffVersion(id: string, versionId: string): Promise<VersionDiff> {
+  return apiFetch<VersionDiff>(
+    `/api/v1/documents/${id}/versions/${versionId}/diff`,
+  );
 }
 
 /** Put the document back to an earlier state.

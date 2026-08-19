@@ -5,29 +5,25 @@ import { DocumentList } from "@/components/documents/DocumentList";
 import { DocumentSearch } from "@/components/documents/DocumentSearch";
 import { ImportDocumentButton } from "@/components/documents/ImportDocumentButton";
 import { StarButton } from "@/components/documents/StarButton";
-import { getDocuments, getStarred } from "@/lib/api/server";
-import type { DocumentListResponse, DocumentSummary } from "@/lib/api/types";
+import { getDocuments } from "@/lib/api/server";
+import type { DocumentListResponse } from "@/lib/api/types";
 
 export const metadata = { title: "Your documents — Folium" };
 
 export default async function DashboardPage() {
   let data: DocumentListResponse;
-  let starred: DocumentSummary[];
   try {
-    // In parallel: one waiting on the other would double the time to first
-    // paint for no reason, since neither depends on the other's answer.
-    [data, starred] = await Promise.all([getDocuments(), getStarred()]);
+    // One call, not two. Stars used to be fetched separately, and each
+    // authenticated request costs a database round trip of roughly half a
+    // second against a hosted Postgres — the list carries the flag now.
+    data = await getDocuments();
   } catch (error) {
     return <ApiErrorMessage error={error} />;
   }
 
-  // A set, not `.some()` per row: the dashboard renders every document a person
-  // owns, and a linear scan inside a render loop is quadratic for no benefit.
-  const starredIds = new Set(starred.map((document) => document.id));
-
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Documents</h1>
         <div className="flex items-center gap-4">
           <ImportDocumentButton />
@@ -43,7 +39,7 @@ export default async function DashboardPage() {
         emptyMessage="You have no documents yet."
         renderAction={(document) => (
           <span className="flex items-center gap-1">
-            <StarButton documentId={document.id} starred={starredIds.has(document.id)} />
+            <StarButton documentId={document.id} starred={document.starred} />
             <DeleteDocumentDialog document={document} />
           </span>
         )}
@@ -60,7 +56,7 @@ export default async function DashboardPage() {
         // Starrable but not deletable: a star is a private bookmark, which is
         // why a collaborator may keep one on a document they cannot delete.
         renderAction={(document) => (
-          <StarButton documentId={document.id} starred={starredIds.has(document.id)} />
+          <StarButton documentId={document.id} starred={document.starred} />
         )}
       />
     </>

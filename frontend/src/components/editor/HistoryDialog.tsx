@@ -12,8 +12,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { getVersion, listVersions, restoreVersion } from "@/lib/api/documents";
-import type { TipTapDoc, VersionDetail, VersionSummary } from "@/lib/api/types";
+import { diffVersion, getVersion, listVersions, restoreVersion } from "@/lib/api/documents";
+import { VersionDiff as VersionDiffView } from "@/components/editor/VersionDiff";
+import type {
+  TipTapDoc,
+  VersionDetail,
+  VersionDiff,
+  VersionSummary,
+} from "@/lib/api/types";
 import { relativeTime } from "@/lib/format/relativeTime";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +61,10 @@ export function HistoryDialog({
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
   const [selected, setSelected] = useState<VersionDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  const [diff, setDiff] = useState<VersionDiff | null>(null);
+  // Which pane is showing. Preview answers "what did it say", changes
+  // answers "what would restoring cost me" — different questions.
+  const [view, setView] = useState<"preview" | "changes">("preview");
   const [error, setError] = useState<unknown>(null);
 
   const reload = useCallback(async () => {
@@ -73,7 +83,14 @@ export function HistoryDialog({
     setError(null);
     setBusy(true);
     try {
-      setSelected(await getVersion(documentId, versionId));
+      // Both at once: the diff is what most people open history for, and
+      // fetching it only when the tab is clicked makes that the slow path.
+      const [version, changes] = await Promise.all([
+        getVersion(documentId, versionId),
+        diffVersion(documentId, versionId),
+      ]);
+      setSelected(version);
+      setDiff(changes);
     } catch (e) {
       setError(e);
     } finally {
@@ -169,9 +186,41 @@ export function HistoryDialog({
           <div className="min-w-0">
             {selected ? (
               <>
-                <pre className="max-h-72 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm whitespace-pre-wrap text-neutral-800">
-                  {toPlainText(selected.content) || "This version was empty."}
-                </pre>
+                <div role="tablist" aria-label="Version view" className="mb-2 flex gap-1">
+                  {(["preview", "changes"] as const).map((pane) => (
+                    <button
+                      key={pane}
+                      type="button"
+                      role="tab"
+                      aria-selected={view === pane}
+                      onClick={() => setView(pane)}
+                      className={
+                        "rounded-md px-2.5 py-1 text-sm capitalize transition-colors " +
+                        (view === pane
+                          ? "bg-neutral-100 font-medium text-carmine-700"
+                          : "text-neutral-600 hover:bg-neutral-50")
+                      }
+                    >
+                      {pane}
+                    </button>
+                  ))}
+                </div>
+
+                {view === "preview" ? (
+                  <pre className="max-h-72 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-sm whitespace-pre-wrap text-neutral-800">
+                    {toPlainText(selected.content) || "This version was empty."}
+                  </pre>
+                ) : diff ? (
+                  <VersionDiffView
+                    segments={diff.segments}
+                    added={diff.added}
+                    removed={diff.removed}
+                  />
+                ) : (
+                  <p className="text-sm text-neutral-500">
+                    Changes could not be compared for this version.
+                  </p>
+                )}
                 {canEdit && (
                   <div className="mt-3 flex justify-end">
                     {/* Absent for a viewer: the backend 404s their restore, so

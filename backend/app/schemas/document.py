@@ -112,6 +112,20 @@ class DocumentOut(DocumentSummary):
         return settings.attachments_enabled
 
 
+class DocumentListItem(DocumentSummary):
+    """A document in a list, and whether this person starred it.
+
+    Carried here rather than fetched separately, and that is a performance
+    decision with a measurable cost behind it. The dashboard used to call
+    /documents and /documents/starred, and each authenticated call pays a
+    database round trip of roughly half a second against a hosted Postgres in
+    another region. Folding the flag into the list it belongs to removes an
+    entire request from the page.
+    """
+
+    starred: bool = False
+
+
 class DocumentListOut(BaseModel):
-    owned: list[DocumentSummary]
-    shared: list[DocumentSummary]
+    owned: list[DocumentListItem]
+    shared: list[DocumentListItem]

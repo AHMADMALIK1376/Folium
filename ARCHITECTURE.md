@@ -136,9 +136,9 @@ from.
 
 ## The data model, and what changed
 
-Seven tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
-`document_stars` and `folders` — the last two added in Phases 8 and 13. The full DDL is in the spec.
-The changes that matter:
+Eight tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
+`document_stars`, `folders` and `comments` — the last three added in Phases 8, 13 and 14. The full
+DDL is in the spec. The changes that matter:
 
 **`content` becomes `jsonb` instead of an HTML string.** The most consequential change. v1 stores
 rendered HTML; TipTap's native format is JSON, with HTML as one possible export. Storing JSON means
@@ -146,7 +146,8 @@ never parsing HTML to manipulate a document, makes content queryable, and is req
 collaboration service, which operates on structured nodes. Staying on HTML would actively obstruct
 real-time editing.
 
-**A `permission` column on shares** — view / comment / edit, replacing v1's binary access.
+**A `permission` column on shares** — view / comment / edit, replacing v1's binary access. The
+middle level was inert until Phase 14, when comments gave it something to do.
 
 **A `document_versions` table** — snapshots on meaningful saves, enabling restore.
 
@@ -168,6 +169,14 @@ Supabase auth ids; real timestamps sort correctly across timezones.
 
 **Attachments store a path, not bytes.** v1 keeps file bytes in a `BLOB` column, which bloats the
 database, slows backups, and burns the free-tier storage quota. Files belong in Supabase Storage.
+
+**A `comments` table whose anchor is text, not a position.** `quote`, `prefix` and `suffix` rather
+than offsets or a mark in the content — and that is a permissions decision as much as a durability
+one. A mark would make commenting a content write, which is exactly what the `comment` permission
+withholds; offsets drift on every edit above them. The passage is found by searching for the quote
+and highlighted with a ProseMirror decoration, so nothing about commenting touches the document.
+`author_id` is `ON DELETE SET NULL` (a discussion outlives its participants) while `parent_id`
+cascades (a reply without its comment is meaningless).
 
 **A `folders` table, and `documents.folder_id` as `ON DELETE SET NULL`.** The null is the design.
 Cascading would make reorganising destructive — deleting a folder would delete work — and the app

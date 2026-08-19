@@ -37,5 +37,15 @@ def can_edit(permission: Permission | None) -> bool:
     return permission in (Permission.OWNER, Permission.EDIT)
 
 
+def can_comment(permission: Permission | None) -> bool:
+    """Whether the caller may write a comment.
+
+    Edit implies comment: someone trusted to change the words is not thereby
+    forbidden from discussing them. View does not — that is the whole point of
+    there being three levels.
+    """
+    return permission in (Permission.OWNER, Permission.EDIT, Permission.COMMENT)
+
+
 def can_view(permission: Permission | None) -> bool:
     return permission is not None

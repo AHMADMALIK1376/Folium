@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     attachments,
     collab,
+    comments,
     documents,
     export,
     folders,
@@ -30,3 +31,4 @@ api_router.include_router(versions.router)
 api_router.include_router(collab.router)
 api_router.include_router(export.router)
 api_router.include_router(attachments.router)
+api_router.include_router(comments.router)

@@ -52,13 +52,6 @@ const setEditable = vi.fn();
 vi.mock("@tiptap/react", () => ({
   useEditor: (options: { editable: boolean }) => ((editorOptions = options), {
     isActive: () => false,
-    // The comments panel subscribes to selection changes, and dispatches its
-    // anchors through the view. `view` is deliberately absent here: the panel
-    // has to cope with an editor whose view is not attached yet, which is a
-    // real window in the browser and not a testing artefact.
-    on: vi.fn(),
-    off: vi.fn(),
-    isDestroyed: false,
     // FormattingControls reads the current colour and font from here; a mock
     // without it throws and takes every test in this file down with it.
     getAttributes: () => ({}),
@@ -78,8 +71,13 @@ vi.mock("@tiptap/react", () => ({
     isEditable: options.editable,
     isEmpty: true,
     commands: { setContent: vi.fn() },
+    // The comments panel subscribes to selection changes through these, and
+    // dispatches its anchors through `view`. `view` is deliberately absent: the
+    // panel has to cope with an editor whose view is not attached yet, which is
+    // a real window in the browser and not a testing artefact.
     on: vi.fn(),
     off: vi.fn(),
+    isDestroyed: false,
   }),
   EditorContent: () => <div data-testid="editor-content" />,
 }));

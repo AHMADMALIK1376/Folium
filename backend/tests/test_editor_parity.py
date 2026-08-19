@@ -69,6 +69,14 @@ NODE_SAMPLES: dict[str, dict] = {
         "content": [{"type": "text", "text": "print(1)"}],
     },
     "horizontalRule": {"type": "horizontalRule"},
+    "image": {
+        "type": "image",
+        "attrs": {
+            "src": "/api/v1/documents/abc/attachments/def/raw",
+            "alt": "A diagram",
+            "title": None,
+        },
+    },
     "hardBreak": {
         "type": "paragraph",
         "attrs": {"textAlign": None},

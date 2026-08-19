@@ -1,16 +1,19 @@
 import type { DocumentSummary } from "@/lib/api/types";
 import { DocumentCard } from "./DocumentCard";
 
-export function DocumentList({
+/** Generic over the document shape so a caller can pass a richer one — the
+ *  dashboard's list items carry `starred` — without this component needing to
+ *  know about it, and without widening DocumentSummary for everyone. */
+export function DocumentList<T extends DocumentSummary>({
   title,
   documents,
   emptyMessage,
   renderAction,
 }: {
   title: string;
-  documents: DocumentSummary[];
+  documents: T[];
   emptyMessage?: string;
-  renderAction?: (document: DocumentSummary) => React.ReactNode;
+  renderAction?: (document: T) => React.ReactNode;
 }) {
   // A section with nothing in it and nothing to say is noise, so it is omitted
   // entirely rather than shown as an empty heading.

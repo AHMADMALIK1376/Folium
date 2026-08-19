@@ -136,9 +136,9 @@ from.
 
 ## The data model, and what changed
 
-Eight tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
-`document_stars`, `folders` and `comments` — the last three added in Phases 8, 13 and 14. The full
-DDL is in the spec. The changes that matter:
+Ten tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
+`document_stars`, `folders`, `comments`, `notifications` and `comment_mentions` — the last five
+added in Phases 8, 13, 14 and 15. The full DDL is in the spec. The changes that matter:
 
 **`content` becomes `jsonb` instead of an HTML string.** The most consequential change. v1 stores
 rendered HTML; TipTap's native format is JSON, with HTML as one possible export. Storing JSON means
@@ -177,6 +177,18 @@ withholds; offsets drift on every edit above them. The passage is found by searc
 and highlighted with a ProseMirror decoration, so nothing about commenting touches the document.
 `author_id` is `ON DELETE SET NULL` (a discussion outlives its participants) while `parent_id`
 cascades (a reply without its comment is meaningless).
+
+**A `notifications` table whose reads re-check access.** The row holds a document title, so a
+notification written while a document was shared with someone and read after their share was revoked
+would leak it. Rather than deleting notifications on revocation — a cleanup job that fails silently
+the first time another way to lose access is added — every read joins to the document and its shares
+and returns only what the caller can still see. `document_id` and `comment_id` CASCADE, the opposite
+of the folders rule and right for the opposite reason: a notification exists *because* of the thing
+it points at, and one pointing at a deleted comment promises something to look at and delivers a 404.
+
+**A `comment_mentions` table rather than parsing the comment body.** Display names contain spaces,
+so "where does `@Ada Lovelace` end?" has no reliable answer. The client picked the person from a
+list and says who; the body keeps the readable form.
 
 **A `folders` table, and `documents.folder_id` as `ON DELETE SET NULL`.** The null is the design.
 Cascading would make reorganising destructive — deleting a folder would delete work — and the app

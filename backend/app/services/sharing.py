@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundError, ValidationError
 from app.models import Document, DocumentShare, User
 from app.schemas.share import ShareCreate
+from app.services import notifications
 from app.services.documents import get_document
 from app.services.permissions import Permission
 
@@ -61,6 +62,12 @@ async def share_document(
             granted_by=owner_id,
         )
         db.add(share)
+        # Only on a new share, and in the same transaction as it. Changing
+        # someone's level is not news worth a second notification — they
+        # already know the document exists.
+        notifications.for_new_share(
+            db, user_id=target.id, actor_id=owner_id, document_id=document_id
+        )
     else:
         share.permission = data.permission
 
@@ -97,4 +104,9 @@ async def unshare_document(
             DocumentShare.user_id == target_user_id,
         )
     )
+    # "You were given access" is the one notification whose text becomes false
+    # the moment access is taken away. list_for already hides it, so this
+    # changes nothing observable — it is here so the falsehood is not left in
+    # the table relying on a filter that someone might later bypass.
+    await notifications.forget_share(db, document_id, target_user_id)
     await db.commit()

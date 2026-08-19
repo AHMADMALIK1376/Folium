@@ -176,7 +176,7 @@ function FolderRow({ folder, onDone }: { folder: Folder; onDone: () => void }) {
           </Button>
         </form>
       ) : (
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="min-w-0 truncate text-sm text-neutral-900">
             {folder.name}
             <span className="ml-2 text-xs text-neutral-400">

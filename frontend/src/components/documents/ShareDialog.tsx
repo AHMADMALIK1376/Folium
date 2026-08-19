@@ -201,7 +201,11 @@ export function ShareDialog({ documentId }: { documentId: string }) {
           }}
         >
           <Label htmlFor="share-email">Email</Label>
-          <div className="flex items-center gap-2">
+          {/* Stacked below sm. Side by side on a 375px screen, the permission
+              select and the Share button left the email field about 100px wide
+              — enough to show "colleague@" and no more. It did not overflow,
+              which is why only looking at it caught this. */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
               id="share-email"
               type="email"
@@ -210,26 +214,28 @@ export function ShareDialog({ documentId }: { documentId: string }) {
               onChange={(event) => setEmail(event.target.value)}
               className="min-w-0 flex-1"
             />
-            <label className="sr-only" htmlFor="new-share-permission">
-              Permission for the new collaborator
-            </label>
-            <select
-              id="new-share-permission"
-              value={permission}
-              onChange={(event) =>
-                setPermission(event.target.value as GrantablePermission)
-              }
-              className="rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
-            >
-              {GRANTABLE.map((value) => (
-                <option key={value} value={value}>
-                  {permissionLabel(value)}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" disabled={busy}>
-              Share
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="new-share-permission">
+                Permission for the new collaborator
+              </label>
+              <select
+                id="new-share-permission"
+                value={permission}
+                onChange={(event) =>
+                  setPermission(event.target.value as GrantablePermission)
+                }
+                className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700 sm:flex-none"
+              >
+                {GRANTABLE.map((value) => (
+                  <option key={value} value={value}>
+                    {permissionLabel(value)}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" disabled={busy}>
+                Share
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

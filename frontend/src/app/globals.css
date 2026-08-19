@@ -306,6 +306,29 @@
   position: relative;
 }
 
+/* A passage someone commented on.
+   Painted by a ProseMirror decoration rather than a mark, so it is an overlay
+   on the view and no part of the document: it cannot reach an export, cannot
+   desynchronise a collaborative room, and needs no write permission to appear.
+   Underline as well as colour, because a highlight distinguished only by hue is
+   invisible to a good number of readers. */
+.folium-comment {
+  background: rgba(251, 191, 36, 0.22);
+  border-bottom: 2px solid rgba(217, 119, 6, 0.55);
+  cursor: pointer;
+}
+
+.folium-comment:hover {
+  background: rgba(251, 191, 36, 0.38);
+}
+
+/* A resolved thread keeps its mark, faintly. The discussion is a record of a
+   decision, and erasing the passage it was about erases half of it. */
+.folium-comment-resolved {
+  background: transparent;
+  border-bottom-color: rgba(115, 115, 115, 0.4);
+}
+
 /* Printing, which is also how a PDF is made.
    No PDF library on either side: an Export action opens the browser's print
    dialog, where every current OS offers "Save as PDF". What follows is the
@@ -325,6 +348,14 @@
 
   /* Collaboration carets are absolutely positioned overlays. On screen they
      are other people; on paper they are stray marks in the margin. */
+  /* A comment highlight is an annotation about the document, not part of it.
+     On paper there is no panel to click through to, so it would be a stray
+     yellow band with no explanation. */
+  .folium-comment {
+    background: transparent !important;
+    border-bottom: none !important;
+  }
+
   .collaboration-cursor__caret,
   .collaboration-cursor__label {
     display: none !important;

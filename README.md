@@ -44,6 +44,7 @@ share them with other people.
 | 11 | Faster authenticated requests, and a phone-usable editor | Done |
 | [12](docs/superpowers/specs/2026-08-17-phase-12-inline-images-design.md) | Images inline in the document, served from a stable URL | Done |
 | [13](docs/superpowers/specs/2026-08-17-phase-13-folders-design.md) | Folders: organisation, not access | Done |
+| [14](docs/superpowers/specs/2026-08-20-phase-14-comments-design.md) | Comments, anchored to a passage — and the `comment` permission finally means something | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -72,8 +73,10 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
   bucket is configured. **Place an image inline** in the text, where it survives export and reload.
-- Share a document by email with view or edit access, change someone's level, or revoke it. The
-  dashboard separates documents you own from documents shared with you.
+- Share a document by email with **view, comment or edit** access, change someone's level, or
+  revoke it. The dashboard separates documents you own from documents shared with you.
+- **Comment on a document, or on a passage inside it** — reply, resolve, reopen. A commenter can
+  join the discussion without being able to change a word of the document.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
   type — when a collaboration server is configured.
 - Browse a document's version history, preview an earlier draft, **see exactly what changed**, and
@@ -365,6 +368,39 @@ alone". The backend tells them apart with Pydantic's `model_fields_set`. Without
 title-only autosave — which the editor sends constantly — would read as an unfile, and documents
 would silently fall out of their folders while being typed in.
 
+## Comments
+
+Comment on a document, or select a passage and comment on that. Reply one level deep, resolve a
+thread, reopen it. Anyone who can view a document can read its discussion; writing needs **comment**
+access or better, which the share dialog now offers.
+
+**The interesting decision is where a comment's anchor lives**, and only one answer survives the
+constraint this app already had.
+
+| | Why not |
+|---|---|
+| A mark in the document | Applying a mark is a **content write**, and the `comment` permission exists precisely for someone who may not write the content. Disqualifying, not merely awkward |
+| Character offsets | Drift on any edit above them, continuously under live collaboration. A comment that silently points at the wrong sentence is worse than one that admits it lost its place |
+| Yjs relative positions | The right tool, and unavailable: the Yjs document only exists when y-sweet is configured, and collaboration is optional here |
+
+So an anchor is a **text quote selector** — the quoted text plus about sixty characters either side,
+as in the W3C Web Annotation model. The passage is found by looking for it, scoring each occurrence
+by how much of the recorded context still surrounds it, and the highlight is drawn as a ProseMirror
+**decoration**: a view-layer overlay that never touches the document. Nothing about commenting writes
+content, which is what makes the permission enforceable at the only place that counts.
+
+Editing elsewhere in the document does not move a comment. Rewriting the passage itself **detaches**
+it: the thread stays, quoting the text it was about, and the highlight disappears rather than
+reattaching to whatever is nearest. Losing a highlight is recoverable; pointing confidently at the
+wrong paragraph is not.
+
+Two smaller rules worth knowing:
+
+- **The owner can delete any comment and edit none.** Deleting is moderation — it is their document.
+  Changing someone's words while their name stays on them is forgery, so no interface offers it.
+- **A discussion outlives the account that took part in it.** `author_id` is `ON DELETE SET NULL`,
+  and a comment from a deleted account renders as "Unknown" rather than vanishing.
+
 ## Repository layout
 
 ```
@@ -436,7 +472,12 @@ DEPLOY.md               deployment guide
 - **Folders do not nest, are not shared, and hold only documents you own.** A shared folder gives a
   document two sources of truth about who may read it. One level answers the actual need and can
   become a tree later; a tree cannot become simple again.
-- **No comments**, though the permission model already carries a `comment` level for them.
+- **A comment's anchor is a quote, not a position.** It survives edits elsewhere in the document,
+  and when its own passage is rewritten the comment says so rather than reattaching to whatever text
+  is nearest. See the Comments section for why every other option was worse.
+- **Comments are plain text, with no mentions or notifications.** Both need an addressing model this
+  app does not have.
+- **A comment cannot be reattached by hand** once its passage is gone.
 
 ## Development
 

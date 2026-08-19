@@ -5,6 +5,8 @@ import type {
   AttachmentUrl,
   CollabSession,
   DocumentDetail,
+  Comment,
+  CommentThread,
   Folder,
   GrantablePermission,
   SearchResults,
@@ -319,4 +321,53 @@ function filenameFrom(header: string | null): string {
   }
 
   return header?.match(/filename="([^"]+)"/)?.[1] ?? "document.md";
+}
+
+/** Threads on a document, oldest first, each with its replies.
+ *
+ * Anyone who can view the document can read these — a discussion about a
+ * document is part of reading it. */
+export function listComments(documentId: string): Promise<CommentThread[]> {
+  return apiFetch<CommentThread[]>(`/api/v1/documents/${documentId}/comments`);
+}
+
+export interface NewComment {
+  body: string;
+  /** Absent for a comment on the document as a whole. */
+  quote?: string | null;
+  prefix?: string | null;
+  suffix?: string | null;
+  /** Set to reply to a thread. A reply carries no quote of its own. */
+  parent_id?: string | null;
+}
+
+export function createComment(documentId: string, comment: NewComment): Promise<Comment> {
+  return apiFetch<Comment>(`/api/v1/documents/${documentId}/comments`, {
+    method: "POST",
+    body: JSON.stringify(comment),
+  });
+}
+
+/** Edit a body, resolve a thread, or both.
+ *
+ * The two carry different authorities — a body is its author's, resolving is
+ * anyone who may comment — and the backend checks each separately. Omit a key
+ * to leave it alone: `resolved: false` reopens a thread, so it cannot double as
+ * "not sent". */
+export function updateComment(
+  documentId: string,
+  commentId: string,
+  patch: { body?: string; resolved?: boolean },
+): Promise<Comment> {
+  return apiFetch<Comment>(`/api/v1/documents/${documentId}/comments/${commentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+/** Delete a comment. Its replies go with it. */
+export function deleteComment(documentId: string, commentId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/documents/${documentId}/comments/${commentId}`, {
+    method: "DELETE",
+  });
 }

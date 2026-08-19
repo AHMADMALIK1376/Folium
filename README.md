@@ -42,6 +42,8 @@ share them with other people.
 | 9 | Colour, fonts and alignment — with export stated as lossy | Done |
 | [10](docs/superpowers/specs/2026-08-17-phase-10-version-diff-design.md) | See what changed between versions | Done |
 | 11 | Faster authenticated requests, and a phone-usable editor | Done |
+| [12](docs/superpowers/specs/2026-08-17-phase-12-inline-images-design.md) | Images inline in the document, served from a stable URL | Done |
+| [13](docs/superpowers/specs/2026-08-17-phase-13-folders-design.md) | Folders: organisation, not access | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -69,7 +71,7 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
-  bucket is configured.
+  bucket is configured. **Place an image inline** in the text, where it survives export and reload.
 - Share a document by email with view or edit access, change someone's level, or revoke it. The
   dashboard separates documents you own from documents shared with you.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
@@ -79,6 +81,9 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Search your documents by any word in a title or a body, including ones shared with you.
 - Star any document you can see — including one shared with you — and reach it from the sidebar.
   Stars are private: starring a shared document does not star it for everyone.
+- **Put your own documents in folders** and filter the dashboard to one. Folders are organisation,
+  not access: filing a document changes nothing about who can read it, and deleting a folder keeps
+  its documents.
 - Delete a document and restore it from the trash.
 - Everything persists and survives a refresh or a server restart.
 
@@ -327,6 +332,39 @@ window.
 Each document keeps its newest 50 versions. Changing only the title records nothing. Anyone who can
 view a document can read its history; only someone who can edit it can restore.
 
+## Folders
+
+Folders group **the documents you own**, and nothing else. Create one from the `+` beside **Folders**
+in the sidebar; file a document with the small control on its card; click a folder to filter the
+dashboard to it. **Unfiled** is the complement.
+
+**Filing is organisation, not access.** Putting a document in a folder changes nothing about who can
+read it. The alternative — a shared folder whose contents everyone sees — gives a document two
+sources of truth about its permissions, its shares and its folder, and every way of resolving a
+disagreement between them surprises somebody. The surprise is always "a document I thought was
+private is not".
+
+A document shared *with* you therefore has no folder control. It is not yours to file, and the
+backend refuses it with a 404 — the same rule the whole app follows, so the API never confirms that
+someone else's folder exists.
+
+| | |
+|---|---|
+| Owner | One user, always |
+| Contains | Documents that user owns |
+| Nesting | None. One level |
+| A document | Is in at most one folder, or none |
+| Deleting a folder | Keeps its documents. They become unfiled |
+
+**Deleting a folder does not delete its documents** (`ON DELETE SET NULL`). Reorganising should never
+destroy work, and there is already a trash for deleting.
+
+One implementation note worth knowing: filing rides on the document `PATCH` rather than earning its
+own route, and `folder_id: null` means "unfile" while **omitting the key** means "leave the folder
+alone". The backend tells them apart with Pydantic's `model_fields_set`. Without that, every
+title-only autosave — which the editor sends constantly — would read as an unfile, and documents
+would silently fall out of their folders while being typed in.
+
 ## Repository layout
 
 ```
@@ -382,9 +420,11 @@ DEPLOY.md               deployment guide
   varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
   that has not signed up fails rather than waiting for them.
-- **Attachments are a list, not part of the document.** They sit below the editor; an image cannot be
-  placed inline in the text, which would mean TipTap schema changes and a round trip through import
-  and export.
+- **An inline image is a link, not the bytes.** The document stores a stable route
+  (`/attachments/{id}/raw`) that authorises the caller and redirects to a freshly-signed URL. A
+  signed URL written into the content would expire and the document would rot; a public bucket would
+  make every attachment readable by anyone who guessed a path. Non-image attachments remain a list
+  below the editor.
 - **Attachments are not versioned**, and restoring an earlier draft does not restore the files that
   were attached at the time.
 - **Attachments are not scanned.** The defence is the extension allow-list, the exclusion of SVG, and
@@ -393,6 +433,9 @@ DEPLOY.md               deployment guide
   is no permanent delete, so nothing removes them.
 - **Search is lexical, not semantic.** It matches words, not meaning: searching "money" will not
   find "revenue". Worth stating, because the alternative is concluding search is broken.
+- **Folders do not nest, are not shared, and hold only documents you own.** A shared folder gives a
+  document two sources of truth about who may read it. One level answers the actual need and can
+  become a tree later; a tree cannot become simple again.
 - **No comments**, though the permission model already carries a `comment` level for them.
 
 ## Development

@@ -1,11 +1,29 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { Logo } from "@/components/Logo";
 import { Sidebar } from "@/components/Sidebar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { StaleSessionGuard } from "@/components/auth/StaleSessionGuard";
+import { getFolders } from "@/lib/api/server";
+import type { Folder } from "@/lib/api/types";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  // Fetched here rather than per page because the rail is part of the shell.
+  // It costs no wall-clock time: Next renders the layout and the page
+  // concurrently, so this runs alongside the page's own fetch rather than
+  // before it.
+  //
+  // Never allowed to throw. A page can render an ApiErrorMessage when its
+  // fetch fails; the shell has nowhere to put one, and a folder list that
+  // could take down every page including the editor is not worth having.
+  let folders: Folder[] = [];
+  try {
+    folders = await getFolders();
+  } catch {
+    folders = [];
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* One guard for every page behind the auth boundary: a bfcache restore
@@ -30,7 +48,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           screen spent a third of it on empty margins — the editor keeps its own
           reading width via .folium-prose rather than the shell enforcing one. */}
       <div className="mx-auto flex max-w-[1600px] flex-col gap-8 px-6 py-8 sm:flex-row">
-        <Sidebar />
+        {/* The sidebar reads the folder filter out of the query string,
+            which makes it a Suspense boundary's problem rather than the whole
+            route's. */}
+        <Suspense fallback={<div className="shrink-0 sm:w-44" />}>
+          <Sidebar folders={folders} />
+        </Suspense>
         <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>

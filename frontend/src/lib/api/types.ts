@@ -38,6 +38,20 @@ export interface SearchResults {
  * round trip of roughly half a second against a hosted Postgres. */
 export interface DocumentListItem extends DocumentSummary {
   starred: boolean;
+  /** Null when unfiled. Only a document you own can be in a folder — folders
+   *  are one person's organisation of their own work. */
+  folder_id: string | null;
+}
+
+/** A folder, with how much is in it.
+ *
+ * Organisation, not access: filing a document changes nothing about who can
+ * read it. The count excludes the trash. */
+export interface Folder {
+  id: string;
+  name: string;
+  created_at: string;
+  document_count: number;
 }
 
 export interface DocumentListResponse {

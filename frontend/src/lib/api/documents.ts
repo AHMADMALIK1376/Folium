@@ -5,6 +5,7 @@ import type {
   AttachmentUrl,
   CollabSession,
   DocumentDetail,
+  Folder,
   GrantablePermission,
   SearchResults,
   Share,
@@ -20,6 +21,10 @@ import type {
 export interface DocumentPatch {
   title?: string;
   content?: TipTapDoc;
+  /** null unfiles the document. Omit the key entirely to leave its folder
+   *  alone — the backend distinguishes the two, and sending null on every save
+   *  would take documents out of their folders as they were typed in. */
+  folder_id?: string | null;
 }
 
 /** Save a document.
@@ -39,6 +44,36 @@ export function updateDocument(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+/** This person's folders, with counts. */
+export function listFolders(): Promise<Folder[]> {
+  return apiFetch<Folder[]>("/api/v1/folders");
+}
+
+export function createFolder(name: string): Promise<Folder> {
+  return apiFetch<Folder>("/api/v1/folders", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function renameFolder(id: string, name: string): Promise<Folder> {
+  return apiFetch<Folder>(`/api/v1/folders/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}
+
+/** Delete a folder. Its documents survive, unfiled — deleting a folder is
+ *  tidying, and there is already a trash for deleting. */
+export function deleteFolder(id: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/folders/${id}`, { method: "DELETE" });
+}
+
+/** File a document into a folder, or `null` to unfile it. */
+export function fileDocument(id: string, folderId: string | null): Promise<DocumentDetail> {
+  return updateDocument(id, { folder_id: folderId });
 }
 
 /** Who a document is shared with. Anyone who can view it may ask. */

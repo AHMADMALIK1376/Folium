@@ -1,6 +1,7 @@
 import Color from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";
 import Highlight from "@tiptap/extension-highlight";
+import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -70,6 +71,16 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     Highlight,
     Subscript,
     Superscript,
+    Image.configure({
+      // Block-level only. An inline image inside a paragraph has no Markdown
+      // spelling that survives a round trip cleanly, and the editor gains
+      // little from it.
+      inline: false,
+      // Every image is an attachment of its own document, so its src is always
+      // a Folium URL. Base64 in the document would put a 2MB photo into the
+      // JSONB column and into every version snapshot of it.
+      allowBase64: false,
+    }),
     TaskList,
     // Nesting is out of scope this phase, and the Markdown converters would have
     // to learn indentation to carry it.

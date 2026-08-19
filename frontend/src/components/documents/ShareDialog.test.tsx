@@ -60,26 +60,23 @@ describe("ShareDialog", () => {
     expect(await screen.findByText(/not shared with anyone/i)).toBeInTheDocument();
   });
 
-  it("shows an existing comment share but never offers comment as a choice", async () => {
-    // The backend accepts three levels; commenting is not built, so granting it
-    // would promise a capability that does not exist. Displaying one that
-    // already exists is a different matter — hiding it would misreport access.
+  it("offers all three levels, comment included", async () => {
+    // Withheld for thirteen phases because it did nothing: granting it would
+    // have handed someone a document they could neither comment on nor edit.
+    // Phase 14 built commenting, so it is grantable now.
     listShares.mockResolvedValue([share({ permission: "comment" })]);
 
     await open();
-
-    // Shown, so the control does not misreport their actual access...
-    const shown = await screen.findByRole("option", { name: /can comment/i });
-    expect(shown).toBeInTheDocument();
-    // ...but not selectable, so it cannot be granted to anyone new.
-    expect(shown).toBeDisabled();
+    // Two selects carry it now — the existing share's and the new share's —
+    // which is the point: it is an ordinary level like the other two.
+    expect(await screen.findAllByRole("option", { name: /can comment/i })).toHaveLength(2);
 
     const selectable = screen
       .getAllByRole("option")
       .filter((option) => !(option as HTMLOptionElement).disabled)
       .map((option) => option.textContent);
-    expect(selectable.join(" ")).not.toMatch(/comment/i);
     expect(selectable.join(" ")).toMatch(/can view/i);
+    expect(selectable.join(" ")).toMatch(/can comment/i);
     expect(selectable.join(" ")).toMatch(/can edit/i);
   });
 

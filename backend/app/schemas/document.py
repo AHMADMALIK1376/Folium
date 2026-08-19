@@ -66,6 +66,14 @@ class DocumentCreate(BaseModel):
 class DocumentUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     content: dict[str, Any] | None = None
+    # Filing is a property of the document, so it rides the document PATCH
+    # rather than earning a route.
+    #
+    # None here is MEANINGFUL — it means "take this out of its folder" — so the
+    # caller must distinguish it from the field being omitted, which means
+    # "leave the folder alone". `model_fields_set` is how: without that check
+    # every title-only autosave would silently unfile the document.
+    folder_id: uuid.UUID | None = None
 
     @field_validator("title")
     @classmethod
@@ -124,6 +132,7 @@ class DocumentListItem(DocumentSummary):
     """
 
     starred: bool = False
+    folder_id: uuid.UUID | None = None
 
 
 class DocumentListOut(BaseModel):

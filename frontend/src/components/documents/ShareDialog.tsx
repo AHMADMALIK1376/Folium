@@ -23,18 +23,17 @@ import {
 import { ApiError } from "@/lib/api/errors";
 import type { GrantablePermission, Share } from "@/lib/api/types";
 
-/** How each stored level reads to a person.
- *
- * "comment" appears here but not in GRANTABLE: an existing comment share must
- * display accurately, while a new one cannot be created until commenting is
- * built. */
+/** How each stored level reads to a person. */
 const LABELS: Record<string, string> = {
   view: "Can view",
   comment: "Can comment",
   edit: "Can edit",
 };
 
-const GRANTABLE: GrantablePermission[] = ["view", "edit"];
+/** All three, as of Phase 14. "comment" was withheld for thirteen phases
+ *  because it did nothing: granting it would have handed someone a document
+ *  they could neither comment on nor edit. */
+const GRANTABLE: GrantablePermission[] = ["view", "comment", "edit"];
 
 function permissionLabel(permission: string) {
   return LABELS[permission] ?? permission;

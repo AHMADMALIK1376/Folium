@@ -38,6 +38,20 @@ export interface SearchResults {
  * round trip of roughly half a second against a hosted Postgres. */
 export interface DocumentListItem extends DocumentSummary {
   starred: boolean;
+  /** Null when unfiled. Only a document you own can be in a folder — folders
+   *  are one person's organisation of their own work. */
+  folder_id: string | null;
+}
+
+/** A folder, with how much is in it.
+ *
+ * Organisation, not access: filing a document changes nothing about who can
+ * read it. The count excludes the trash. */
+export interface Folder {
+  id: string;
+  name: string;
+  created_at: string;
+  document_count: number;
 }
 
 export interface DocumentListResponse {
@@ -59,13 +73,12 @@ export interface TipTapDoc {
  *  derives it by comparing owner_id to the caller. */
 export type Permission = "owner" | "edit" | "comment" | "view";
 
-/** What an owner may grant today.
+/** What an owner may grant.
  *
- * The backend also accepts "comment", but commenting is not built, so granting
- * it would promise a capability that does not exist — the collaborator would
- * find a document they can neither comment on nor edit. An existing comment
- * share is still displayed faithfully; see Permission. */
-export type GrantablePermission = "view" | "edit";
+ * All three, as of Phase 14. "comment" was withheld for thirteen phases because
+ * granting a capability that does not exist would have left the collaborator
+ * with a document they could neither comment on nor edit. It exists now. */
+export type GrantablePermission = "view" | "comment" | "edit";
 
 export interface Share {
   user_id: string;
@@ -160,4 +173,33 @@ export interface CollabSession {
   /** The caller — whoever is signed in — not the document's owner. Cursor
    *  labels come from here. */
   user: CollabUser;
+}
+
+/** A comment on a document, or on a passage inside it.
+ *
+ * The anchor is a text quote selector — `quote` plus a little of what surrounded
+ * it — and never a mark in the document. A mark would be a content write, and
+ * the whole point of the `comment` permission is someone who may not write the
+ * content. A comment with no quote is about the document as a whole. */
+export interface Comment {
+  id: string;
+  document_id: string;
+  parent_id: string | null;
+  body: string;
+  quote: string | null;
+  prefix: string | null;
+  suffix: string | null;
+  author_id: string | null;
+  /** Null when the author's account was deleted — author_id is ON DELETE SET
+   *  NULL, so a discussion outlives the account that took part in it. */
+  author_name: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A root comment with its replies. Replies go one level deep and no further. */
+export interface CommentThread extends Comment {
+  replies: Comment[];
 }

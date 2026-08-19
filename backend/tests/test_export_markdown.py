@@ -544,3 +544,57 @@ def test_cells_are_not_padded_to_equal_width():
     )
 
     assert "| a |" in result
+
+
+# --- Phase 12: inline images ---
+
+
+def image(src: str, alt=None) -> dict:
+    return {"type": "image", "attrs": {"src": src, "alt": alt, "title": None}}
+
+
+def test_an_image_becomes_markdown():
+    result = doc_to_markdown(doc(image("/api/v1/documents/a/attachments/b/raw", "A chart")))
+
+    assert result == "![A chart](/api/v1/documents/a/attachments/b/raw)"
+
+
+def test_an_image_survives_a_round_trip():
+    original = doc(image("/api/v1/documents/a/attachments/b/raw", "A chart"))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_an_image_without_alt_text_still_round_trips():
+    original = doc(image("/api/v1/documents/a/attachments/b/raw"))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_a_data_url_image_is_refused_on_import():
+    """A src is something the READER's browser fetches. An SVG data URL is
+    script in an image's clothing, so the same allow-list links use applies."""
+    [block] = markdown_to_doc("![x](data:image/svg+xml;base64,PHN2Zz4=)")["content"]
+
+    # Kept as text rather than discarded — the author's line survives, only the
+    # image does not.
+    assert block["type"] == "paragraph"
+
+
+def test_a_javascript_url_image_is_refused_on_import():
+    [block] = markdown_to_doc("![x](javascript:alert(1))")["content"]
+
+    assert block["type"] == "paragraph"
+
+
+def test_an_https_image_is_allowed():
+    original = doc(image("https://example.com/a.png", "Remote"))
+
+    assert markdown_to_doc(doc_to_markdown(original)) == original
+
+
+def test_an_image_is_not_confused_with_a_link():
+    """"[a](b)" is a link; "![a](b)" is an image. One character apart."""
+    [block] = markdown_to_doc("[a](https://example.com)")["content"]
+
+    assert block["type"] == "paragraph"

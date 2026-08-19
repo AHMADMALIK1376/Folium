@@ -2,7 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EditorToolbar } from "./EditorToolbar";
+vi.mock("@/lib/api/documents", () => ({
+  uploadAttachment: vi.fn(),
+  attachmentRawUrl: (id: string, attachmentId: string) =>
+    `/api/v1/documents/${id}/attachments/${attachmentId}/raw`,
+}));
+
+const { EditorToolbar } = await import("./EditorToolbar");
 
 /** A stand-in for TipTap's chained command API.
  *
@@ -46,7 +52,7 @@ describe("EditorToolbar", () => {
     // type out does not disable it — it only hides it from the person writing,
     // which is how blockquotes and code blocks went unexported for months.
     const { editor } = makeEditor();
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     for (const label of [
       "Bold",
@@ -55,6 +61,7 @@ describe("EditorToolbar", () => {
       "Strikethrough",
       "Inline code",
       "Link",
+      "Insert image",
       "Highlight",
       "Subscript",
       "Superscript",
@@ -87,7 +94,7 @@ describe("EditorToolbar", () => {
     ["Clear formatting", "unsetAllMarks"],
   ])("%s runs %s", async (label, command) => {
     const { editor, called } = makeEditor();
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     await userEvent.click(screen.getByRole("button", { name: label }));
 
@@ -99,7 +106,7 @@ describe("EditorToolbar", () => {
 
   it("reports active state to a screen reader, not just with a colour", () => {
     const { editor } = makeEditor(["blockquote", "strike"]);
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     expect(screen.getByRole("button", { name: "Quote" })).toHaveAttribute(
       "aria-pressed",
@@ -119,7 +126,7 @@ describe("EditorToolbar", () => {
     // It inserts a rule at the caret; there is no state to be in, so a pressed
     // state would be a lie to anyone reading the page with a screen reader.
     const { editor } = makeEditor(["horizontalRule"]);
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     expect(screen.getByRole("button", { name: "Divider" })).toHaveAttribute(
       "aria-pressed",
@@ -129,7 +136,7 @@ describe("EditorToolbar", () => {
 
   it("distinguishes heading levels", () => {
     const { editor } = makeEditor(["heading:2"]);
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     expect(screen.getByRole("button", { name: "Heading 2" })).toHaveAttribute(
       "aria-pressed",
@@ -145,7 +152,7 @@ describe("EditorToolbar", () => {
     // Without preventDefault on mousedown, clicking Bold with text selected
     // collapses the selection and formats nothing.
     const { editor } = makeEditor();
-    render(<EditorToolbar editor={editor as never} />);
+    render(<EditorToolbar editor={editor as never} documentId="doc-1" />);
 
     const button = screen.getByRole("button", { name: "Bold" });
     const event = new MouseEvent("mousedown", { bubbles: true, cancelable: true });

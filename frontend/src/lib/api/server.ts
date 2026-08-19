@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ApiError } from "./errors";
-import type { DocumentDetail, DocumentListResponse, DocumentSummary } from "./types";
+import type { DocumentDetail, DocumentListResponse, DocumentSummary, Folder } from "./types";
 
 /** Call the Folium API from a Server Component.
  *
@@ -77,4 +77,20 @@ export function getDocument(id: string): Promise<DocumentDetail> {
 /** This person's starred documents, most recently starred first. */
 export function getStarred(): Promise<DocumentSummary[]> {
   return serverApiFetch<DocumentSummary[]>("/api/v1/documents/starred");
+}
+
+/** This person's folders, with document counts.
+ *
+ * Called twice per dashboard render — the layout draws the rail, the page needs
+ * the names for its heading and its per-document folder control — and that is
+ * deliberate rather than overlooked. React's cache() would collapse them, but
+ * it is a Server Component API that this React build does not export, so
+ * relying on it takes every test in server.test.ts down at import time.
+ *
+ * The duplicate costs no wall-clock time: Next renders the layout and the page
+ * concurrently, and the page runs its two fetches in a Promise.all, so all
+ * three are in flight together.
+ */
+export function getFolders(): Promise<Folder[]> {
+  return serverApiFetch<Folder[]>("/api/v1/folders");
 }

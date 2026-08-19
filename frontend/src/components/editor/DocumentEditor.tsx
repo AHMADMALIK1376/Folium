@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { AttachmentsPanel } from "@/components/editor/AttachmentsPanel";
+import { CommentsPanel } from "@/components/editor/CommentsPanel";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
@@ -25,13 +26,14 @@ import type { Collaboration as CollaborationState } from "@/lib/collab/useCollab
 import { cursorColor } from "@/lib/collab/color";
 import { decideOnSync } from "@/lib/collab/reconcile";
 import { useCollaboration } from "@/lib/collab/useCollaboration";
+import { CommentHighlights } from "@/lib/editor/commentHighlights";
 import { baseExtensions } from "@/lib/editor/extensions";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 
-/** Read-only covers `comment` as well as `view`.
+/** Whether the document itself may be changed.
  *
- * Commenting is not built yet, and a comment UI that cannot save would be worse
- * than none. This mirrors the backend's `can_edit`, which is the real boundary —
+ * `comment` is not editing: a commenter writes in the panel and never in the
+ * document. This mirrors the backend's `can_edit`, which is the real boundary —
  * a PATCH from anyone else gets a 404 whatever this returns. */
 function canEdit(document: DocumentDetail) {
   return document.permission === "owner" || document.permission === "edit";
@@ -55,6 +57,9 @@ function DocumentEditorSurface({
   const router = useRouter();
   const editable = canEdit(document);
   const [title, setTitle] = useState(document.title);
+  // Set when a highlight in the document is clicked, so the panel can bring
+  // that thread to the reader rather than making them find it.
+  const [openComment, setOpenComment] = useState<string | null>(null);
 
   const save = useCallback(
     async (patch: DocumentPatch, init?: RequestInit) => {
@@ -82,6 +87,12 @@ function DocumentEditorSurface({
       // editor-schema.json. Reading the same array is what stops the contract
       // describing an editor nobody renders.
       ...baseExtensions({ withHistory: !collab.enabled }),
+      // Not part of baseExtensions, deliberately: that array is the schema
+      // contract checked against editor-schema.json, and this contributes no
+      // nodes and no marks. Highlights are decorations — a view-layer overlay
+      // that never touches content, which is exactly why a commenter who may
+      // not write the document can still see and make them.
+      CommentHighlights.configure({ onSelect: (id) => setOpenComment(id) }),
       ...(collab.enabled && collab.doc
         ? [
             Collaboration.configure({ document: collab.doc }),
@@ -281,8 +292,17 @@ function DocumentEditorSurface({
 
       {!editable && (
         <p className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-600">
-          This document is read-only — {document.owner.display_name} shared it with you
-          for viewing.
+          {document.permission === "comment" ? (
+            <>
+              {document.owner.display_name} shared this with you for commenting — you can
+              join the discussion below, but not change the document.
+            </>
+          ) : (
+            <>
+              This document is read-only — {document.owner.display_name} shared it with you
+              for viewing.
+            </>
+          )}
         </p>
       )}
 
@@ -301,7 +321,7 @@ function DocumentEditorSurface({
         {title}
       </h1>
 
-      {editor && editable && <EditorToolbar editor={editor} />}
+      {editor && editable && <EditorToolbar editor={editor} documentId={document.id} />}
       {editor && editable && <FormattingControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
       {/* Positioned relative so the menu can hang off the editor rather than the
@@ -318,6 +338,18 @@ function DocumentEditorSurface({
       {document.attachments_enabled && (
         <AttachmentsPanel documentId={document.id} canEdit={editable} />
       )}
+
+      {/* Shown at every permission level, including view: reading a discussion
+          about a document is part of reading the document. Whether the compose
+          box appears is the panel's own decision, and the backend's. */}
+      <CommentsPanel
+        documentId={document.id}
+        permission={document.permission}
+        currentUserId={collab.user?.id ?? null}
+        editor={editor}
+        openComment={openComment}
+        onOpenedComment={() => setOpenComment(null)}
+      />
     </div>
   );
 }

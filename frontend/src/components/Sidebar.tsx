@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { FolderNav } from "@/components/folders/FolderNav";
+import type { Folder } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 /** The places a document can be, in the order someone looks for one.
@@ -17,14 +19,19 @@ const LINKS = [
   { href: "/trash", label: "Trash" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ folders }: { folders: Folder[] }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // /dashboard?folder=x is still /dashboard, so without this both "Documents"
+  // and the folder would read as the current section.
+  const filtered = pathname === "/dashboard" && searchParams.has("folder");
 
   return (
     <nav aria-label="Sections" className="shrink-0 sm:w-44">
       <ul className="flex gap-1 sm:flex-col">
         {LINKS.map((link) => {
-          const active = pathname === link.href;
+          const active =
+            pathname === link.href && !(filtered && link.href === "/dashboard");
           return (
             <li key={link.href}>
               <Link
@@ -55,6 +62,8 @@ export function Sidebar() {
           );
         })}
       </ul>
+
+      <FolderNav folders={folders} />
     </nav>
   );
 }

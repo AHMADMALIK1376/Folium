@@ -329,3 +329,81 @@ async def test_all_attachment_routes_require_authentication(client, alice_email,
     assert (
         await client.delete(f"/api/v1/documents/{doc_id}/attachments/{attachment_id}")
     ).status_code == 401
+
+
+# --- Phase 12: the raw redirect that makes inline images possible ---
+
+
+async def test_the_raw_endpoint_redirects_to_a_signed_url(client, alice_email, fake_storage):
+    """A signed URL expires in five minutes, so a document embedding one would
+    render briefly and then be broken forever. This URL is stable and the
+    signing happens per request."""
+    doc_id = await make_doc(client, alice_email)
+    attachment_id = (await attach(client, doc_id, alice_email)).json()["id"]
+
+    response = await client.get(
+        f"/api/v1/documents/{doc_id}/attachments/{attachment_id}/raw",
+        headers=auth_headers(alice_email),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"].startswith("https://storage.test/signed/")
+    # Caching the redirect would hand out a link that has already expired.
+    assert response.headers["cache-control"] == "no-store"
+
+
+async def test_a_viewer_may_load_an_image(client, alice_email, bob_email, fake_storage):
+    await ensure_user(client, bob_email)
+    doc_id = await make_doc(client, alice_email)
+    attachment_id = (await attach(client, doc_id, alice_email)).json()["id"]
+    await share(client, doc_id, alice_email, bob_email, "view")
+
+    response = await client.get(
+        f"/api/v1/documents/{doc_id}/attachments/{attachment_id}/raw",
+        headers=auth_headers(bob_email),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+
+
+async def test_a_stranger_cannot_load_an_image(client, alice_email, bob_email, fake_storage):
+    """The reason this is a redirect rather than a public bucket: access is
+    checked on every request, so revoking a share revokes the images too."""
+    doc_id = await make_doc(client, alice_email)
+    attachment_id = (await attach(client, doc_id, alice_email)).json()["id"]
+
+    response = await client.get(
+        f"/api/v1/documents/{doc_id}/attachments/{attachment_id}/raw",
+        headers=auth_headers(bob_email),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 404
+
+
+async def test_an_image_from_another_document_is_not_reachable(client, alice_email, fake_storage):
+    mine = await make_doc(client, alice_email)
+    other = await make_doc(client, alice_email)
+    foreign = (await attach(client, other, alice_email)).json()["id"]
+
+    response = await client.get(
+        f"/api/v1/documents/{mine}/attachments/{foreign}/raw",
+        headers=auth_headers(alice_email),
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 404
+
+
+async def test_the_raw_endpoint_requires_authentication(client, alice_email, fake_storage):
+    doc_id = await make_doc(client, alice_email)
+    attachment_id = (await attach(client, doc_id, alice_email)).json()["id"]
+
+    response = await client.get(
+        f"/api/v1/documents/{doc_id}/attachments/{attachment_id}/raw",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 401

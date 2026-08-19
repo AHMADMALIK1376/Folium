@@ -17,6 +17,7 @@ TASK_RE = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.*)$")
 # A table row is any line with a pipe that is not escaped. The delimiter row —
 # |---|:--:| — is what actually makes it a table in GFM; without one it is
 # paragraphs that happen to contain pipes, so both are required.
+IMAGE_RE = re.compile(r"^!\[([^\]]*)\]\(([^)]*)\)$")
 ROW_RE = re.compile(r"^\s*\|(.+)\|\s*$")
 DELIMITER_RE = re.compile(r"^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$")
 
@@ -373,6 +374,27 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
 
             content.append({"type": "table", "content": rows})
             continue
+
+        # An image is a block of its own. Checked before the paragraph
+        # fallback, which would otherwise keep the whole "![alt](src)" as text.
+        if image := IMAGE_RE.match(line):
+            src = _unescape(image.group(2).strip())
+            if is_safe_url(src):
+                close_list()
+                content.append(
+                    {
+                        "type": "image",
+                        "attrs": {
+                            "src": src,
+                            "alt": _unescape(image.group(1)) or None,
+                            "title": None,
+                        },
+                    }
+                )
+                index += 1
+                continue
+            # An unsafe src drops to a paragraph below, keeping the author's
+            # words rather than discarding the line — the same choice links make.
 
         # Before the bullet rule, which would otherwise never see it — "---" has
         # no space after the dash — but before paragraphs, which would.
@@ -793,6 +815,17 @@ def doc_to_markdown(doc: dict[str, Any]) -> str:
 
         elif kind == "horizontalRule":
             chunks.append("---")
+
+        elif kind == "image":
+            attrs = block.get("attrs")
+            attrs = attrs if isinstance(attrs, dict) else {}
+            src = str(attrs.get("src") or "")
+            # Markdown CAN express an image, so this round-trips — unlike colour
+            # or alignment. The src is a Folium URL that requires signing in,
+            # which is stated in the README rather than left to be discovered by
+            # someone opening the .md elsewhere.
+            if src and is_safe_url(src):
+                chunks.append(f"![{_escape_inline(str(attrs.get('alt') or ''))}]({src})")
 
         elif kind == "table":
             chunks.append(_table_to_markdown(block))

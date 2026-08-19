@@ -5,6 +5,9 @@ import type {
   AttachmentUrl,
   CollabSession,
   DocumentDetail,
+  Comment,
+  CommentThread,
+  Folder,
   GrantablePermission,
   SearchResults,
   Share,
@@ -20,6 +23,10 @@ import type {
 export interface DocumentPatch {
   title?: string;
   content?: TipTapDoc;
+  /** null unfiles the document. Omit the key entirely to leave its folder
+   *  alone — the backend distinguishes the two, and sending null on every save
+   *  would take documents out of their folders as they were typed in. */
+  folder_id?: string | null;
 }
 
 /** Save a document.
@@ -39,6 +46,36 @@ export function updateDocument(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+/** This person's folders, with counts. */
+export function listFolders(): Promise<Folder[]> {
+  return apiFetch<Folder[]>("/api/v1/folders");
+}
+
+export function createFolder(name: string): Promise<Folder> {
+  return apiFetch<Folder>("/api/v1/folders", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function renameFolder(id: string, name: string): Promise<Folder> {
+  return apiFetch<Folder>(`/api/v1/folders/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}
+
+/** Delete a folder. Its documents survive, unfiled — deleting a folder is
+ *  tidying, and there is already a trash for deleting. */
+export function deleteFolder(id: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/folders/${id}`, { method: "DELETE" });
+}
+
+/** File a document into a folder, or `null` to unfile it. */
+export function fileDocument(id: string, folderId: string | null): Promise<DocumentDetail> {
+  return updateDocument(id, { folder_id: folderId });
 }
 
 /** Who a document is shared with. Anyone who can view it may ask. */
@@ -211,6 +248,18 @@ export function attachmentUrl(
   );
 }
 
+/** The stable URL an image node points at.
+ *
+ * Built here rather than returned by the upload, because it is a path this
+ * client owns: a permanent address that redirects to a freshly signed URL each
+ * time it is fetched. A signed URL embedded in a document would render for five
+ * minutes and be broken forever after, including in every version snapshot that
+ * captured it. */
+export function attachmentRawUrl(id: string, attachmentId: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+  return `${base}/api/v1/documents/${id}/attachments/${attachmentId}/raw`;
+}
+
 /** Remove an attachment. Requires edit permission. */
 export function deleteAttachment(
   id: string,
@@ -272,4 +321,53 @@ function filenameFrom(header: string | null): string {
   }
 
   return header?.match(/filename="([^"]+)"/)?.[1] ?? "document.md";
+}
+
+/** Threads on a document, oldest first, each with its replies.
+ *
+ * Anyone who can view the document can read these — a discussion about a
+ * document is part of reading it. */
+export function listComments(documentId: string): Promise<CommentThread[]> {
+  return apiFetch<CommentThread[]>(`/api/v1/documents/${documentId}/comments`);
+}
+
+export interface NewComment {
+  body: string;
+  /** Absent for a comment on the document as a whole. */
+  quote?: string | null;
+  prefix?: string | null;
+  suffix?: string | null;
+  /** Set to reply to a thread. A reply carries no quote of its own. */
+  parent_id?: string | null;
+}
+
+export function createComment(documentId: string, comment: NewComment): Promise<Comment> {
+  return apiFetch<Comment>(`/api/v1/documents/${documentId}/comments`, {
+    method: "POST",
+    body: JSON.stringify(comment),
+  });
+}
+
+/** Edit a body, resolve a thread, or both.
+ *
+ * The two carry different authorities — a body is its author's, resolving is
+ * anyone who may comment — and the backend checks each separately. Omit a key
+ * to leave it alone: `resolved: false` reopens a thread, so it cannot double as
+ * "not sent". */
+export function updateComment(
+  documentId: string,
+  commentId: string,
+  patch: { body?: string; resolved?: boolean },
+): Promise<Comment> {
+  return apiFetch<Comment>(`/api/v1/documents/${documentId}/comments/${commentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+/** Delete a comment. Its replies go with it. */
+export function deleteComment(documentId: string, commentId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/documents/${documentId}/comments/${commentId}`, {
+    method: "DELETE",
+  });
 }

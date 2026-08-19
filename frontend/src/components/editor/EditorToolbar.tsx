@@ -2,6 +2,7 @@
 
 import type { Editor } from "@tiptap/react";
 
+import { ImageButton } from "@/components/editor/ImageButton";
 import { LinkDialog } from "@/components/editor/LinkDialog";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +64,13 @@ function Divider() {
  * shows and the converter carries. `editor-schema.json` holds that contract and
  * both sides are tested against it.
  */
-export function EditorToolbar({ editor }: { editor: Editor }) {
+export function EditorToolbar({
+  editor,
+  documentId,
+}: {
+  editor: Editor;
+  documentId: string;
+}) {
   return (
     <div
       role="toolbar"
@@ -196,6 +203,10 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       >
         &mdash;
       </ToolbarButton>
+
+      <Divider />
+
+      <ImageButton editor={editor} documentId={documentId} />
 
       <Divider />
 

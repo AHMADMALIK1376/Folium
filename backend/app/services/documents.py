@@ -8,7 +8,7 @@ from app.core.constants import empty_doc
 from app.core.exceptions import NotFoundError
 from app.models import Document, DocumentShare, User
 from app.schemas.document import DocumentCreate, DocumentUpdate
-from app.services import versions
+from app.services import folders, versions
 from app.services.permissions import Permission, can_edit, can_view, resolve_permission
 from app.utils.import_file import doc_to_plain_text
 
@@ -111,6 +111,19 @@ async def update_document(
         await versions.maybe_snapshot(db, document, user_id)
         document.content = data.content
         document.content_text = doc_to_plain_text(data.content)
+
+    # `in model_fields_set` rather than `is not None`, because None is a
+    # meaningful value here — it unfiles the document. Checking for None would
+    # make every title-only autosave silently take the document out of its
+    # folder.
+    if "folder_id" in data.model_fields_set:
+        # Only the owner may file, and only into their own folder. Filing is
+        # organisation rather than access, but a collaborator filing someone
+        # else's document into a folder they cannot see would be neither.
+        if document.owner_id != user_id:
+            raise NotFoundError("Document not found")
+        await folders.assert_can_file_into(db, data.folder_id, user_id)
+        document.folder_id = data.folder_id
 
     await db.commit()
     await db.refresh(document)

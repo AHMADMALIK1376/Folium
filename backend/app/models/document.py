@@ -21,6 +21,14 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=empty_doc)
     content_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SET NULL, not CASCADE: deleting a folder is tidying, and tidying must
+    # never destroy work. The documents come back unfiled instead.
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("folders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

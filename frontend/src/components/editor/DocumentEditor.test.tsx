@@ -10,6 +10,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 const updateDocument = vi.fn();
 const listAttachments = vi.fn();
+const listComments = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   updateDocument: (...args: unknown[]) => updateDocument(...args),
   // The attachments panel reaches for these from the same module. Stubbed so a
@@ -19,6 +20,12 @@ vi.mock("@/lib/api/documents", () => ({
   uploadAttachment: vi.fn(),
   attachmentUrl: vi.fn(),
   deleteAttachment: vi.fn(),
+  // Likewise for the comments panel, which is rendered at every permission
+  // level. Its own behaviour is covered in CommentsPanel.test.tsx.
+  listComments: (...args: unknown[]) => listComments(...args),
+  createComment: vi.fn(),
+  updateComment: vi.fn(),
+  deleteComment: vi.fn(),
 }));
 
 /** ProseMirror needs DOM APIs jsdom does not have, and a test driving a mocked
@@ -64,8 +71,13 @@ vi.mock("@tiptap/react", () => ({
     isEditable: options.editable,
     isEmpty: true,
     commands: { setContent: vi.fn() },
+    // The comments panel subscribes to selection changes through these, and
+    // dispatches its anchors through `view`. `view` is deliberately absent: the
+    // panel has to cope with an editor whose view is not attached yet, which is
+    // a real window in the browser and not a testing artefact.
     on: vi.fn(),
     off: vi.fn(),
+    isDestroyed: false,
   }),
   EditorContent: () => <div data-testid="editor-content" />,
 }));
@@ -98,7 +110,11 @@ function makeDocument(
 }
 
 describe("DocumentEditor", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // The comments panel mounts at every permission level.
+    listComments.mockResolvedValue([]);
+  });
 
   it("gives an owner a toolbar and an editable title", () => {
     render(<DocumentEditor document={makeDocument("owner")} />);
@@ -127,12 +143,19 @@ describe("DocumentEditor", () => {
     expect(screen.getAllByText(/quarterly plan/i).length).toBeGreaterThan(0);
   });
 
-  it("treats comment permission as read-only this phase", () => {
-    // Commenting is not built. Offering a comment UI that cannot save would be
-    // worse than not offering one.
+  it("tells a commenter what they can do, rather than calling it read-only", () => {
+    // `comment` is not editing and it is not viewing. Since Phase 14 it is a
+    // level with something to do, and the banner has to say which.
     render(<DocumentEditor document={makeDocument("comment")} />);
 
     expect(screen.queryByRole("button", { name: /bold/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/shared this with you for commenting/i)).toBeInTheDocument();
+    expect(screen.queryByText(/read-only/i)).not.toBeInTheDocument();
+  });
+
+  it("still calls a view-only document read-only", () => {
+    render(<DocumentEditor document={makeDocument("view")} />);
+
     expect(screen.getByText(/read-only/i)).toBeInTheDocument();
   });
 
@@ -217,6 +240,7 @@ function extensionNames() {
 describe("DocumentEditor with collaboration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    listComments.mockResolvedValue([]);
     editorOptions = {};
     Object.assign(collabState, {
       enabled: false,
@@ -300,6 +324,7 @@ describe("DocumentEditor with collaboration", () => {
 describe("cursor identity", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    listComments.mockResolvedValue([]);
     editorOptions = {};
   });
 

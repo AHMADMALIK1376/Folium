@@ -3,11 +3,14 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.exceptions import ValidationError
 from app.schemas.document import DocumentOut
 from app.schemas.user import UserOut
-from app.schemas.version import VersionDetail, VersionSummary
+from app.schemas.version import DiffSegment, VersionDetail, VersionDiff, VersionSummary
 from app.services import documents as documents_service
 from app.services import versions as service
+from app.services.diffing import DocumentTooLargeError, count_changes, diff_text
+from app.utils.import_file import doc_to_plain_text
 
 router = APIRouter(prefix="/documents/{document_id}/versions", tags=["versions"])
 
@@ -63,4 +66,42 @@ async def restore_version(
         content=document.content,
         permission=permission.value,
         owner=UserOut.model_validate(owner),
+    )
+
+
+@router.get("/{version_id}/diff", response_model=VersionDiff)
+async def diff_version(
+    document_id: UUID, version_id: UUID, db: DbSession, user: CurrentUser
+) -> VersionDiff:
+    """What changed between this version and the document as it stands.
+
+    Follows *view*, like the rest of history: a diff discloses nothing the
+    reader could not get by opening both versions themselves.
+
+    Compared against the CURRENT document rather than the neighbouring version,
+    because the question this answers is "what would restoring this cost me",
+    and that is relative to now.
+    """
+    document, _ = await documents_service.get_document(db, document_id, user.id)
+    version, _author = await service.get_version(db, document_id, version_id, user.id)
+
+    before = doc_to_plain_text(version.content)
+    after = doc_to_plain_text(document.content)
+
+    try:
+        segments = diff_text(before, after)
+    except DocumentTooLargeError:
+        # Truthful rather than a timeout. SequenceMatcher is quadratic in the
+        # worst case, and a pair of large documents with little in common is
+        # that worst case.
+        raise ValidationError(
+            "These versions are too large to compare. Preview them instead."
+        ) from None
+
+    added, removed = count_changes(segments)
+
+    return VersionDiff(
+        added=added,
+        removed=removed,
+        segments=[DiffSegment(op=s.op, text=s.text) for s in segments],
     )

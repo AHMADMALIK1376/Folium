@@ -211,6 +211,18 @@ export function attachmentUrl(
   );
 }
 
+/** The stable URL an image node points at.
+ *
+ * Built here rather than returned by the upload, because it is a path this
+ * client owns: a permanent address that redirects to a freshly signed URL each
+ * time it is fetched. A signed URL embedded in a document would render for five
+ * minutes and be broken forever after, including in every version snapshot that
+ * captured it. */
+export function attachmentRawUrl(id: string, attachmentId: string): string {
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "";
+  return `${base}/api/v1/documents/${id}/attachments/${attachmentId}/raw`;
+}
+
 /** Remove an attachment. Requires edit permission. */
 export function deleteAttachment(
   id: string,

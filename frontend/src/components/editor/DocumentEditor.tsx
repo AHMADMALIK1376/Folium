@@ -301,7 +301,7 @@ function DocumentEditorSurface({
         {title}
       </h1>
 
-      {editor && editable && <EditorToolbar editor={editor} />}
+      {editor && editable && <EditorToolbar editor={editor} documentId={document.id} />}
       {editor && editable && <FormattingControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
       {/* Positioned relative so the menu can hang off the editor rather than the

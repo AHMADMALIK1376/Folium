@@ -109,11 +109,15 @@ export function CommentsPanel({
   // meta changes no content — which is the point, and the reason a viewer sees
   // highlights on a document they cannot write to.
   //
-  // The view guard is not defensive noise: a TipTap editor exists for a moment
-  // before its view is attached and again after it is torn down, and
-  // dispatching in either window throws. The editor's own test suite caught it.
+  // `isDestroyed` is the guard that matters, and it is worth saying exactly
+  // what it guards. TipTap builds the view inside the Editor constructor, so
+  // there is no window where an editor exists without one. `destroy()` is the
+  // hazard: it destroys the view but leaves `editor.view` set, so a truthiness
+  // check would sail straight past a torn-down editor and throw on dispatch.
+  // `isDestroyed` reads `!view?.docView`, which is true in both cases — no
+  // view at all, and a view whose document was destroyed.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || !editor.view) return;
+    if (!editor || editor.isDestroyed) return;
     editor.view.dispatch(editor.state.tr.setMeta(SET_COMMENT_ANCHORS, anchors));
   }, [editor, anchors]);
 

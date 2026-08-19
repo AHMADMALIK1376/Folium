@@ -71,13 +71,19 @@ vi.mock("@tiptap/react", () => ({
     isEditable: options.editable,
     isEmpty: true,
     commands: { setContent: vi.fn() },
-    // The comments panel subscribes to selection changes through these, and
-    // dispatches its anchors through `view`. `view` is deliberately absent: the
-    // panel has to cope with an editor whose view is not attached yet, which is
-    // a real window in the browser and not a testing artefact.
+    // The comments panel subscribes to selection changes through these and
+    // dispatches its anchors through the view. A real editor always has one —
+    // TipTap builds it in the Editor constructor — so the mock has one too,
+    // rather than making the component tolerate a state that cannot occur.
     on: vi.fn(),
     off: vi.fn(),
     isDestroyed: false,
+    view: { dispatch: vi.fn() },
+    state: {
+      tr: { setMeta: () => ({}) },
+      selection: { from: 0, to: 0 },
+      doc: { descendants: () => {} },
+    },
   }),
   EditorContent: () => <div data-testid="editor-content" />,
 }));

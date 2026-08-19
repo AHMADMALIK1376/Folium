@@ -245,6 +245,56 @@ describe("CommentsPanel", () => {
     expect(await screen.findByText(/the budget constraint/)).toBeInTheDocument();
   });
 
+  it("does not dispatch into a torn-down editor", async () => {
+    // The lifecycle trap, pinned. TipTap builds the view in the Editor
+    // constructor, so an editor never exists without one — but `destroy()`
+    // destroys the view and *leaves `editor.view` set*, so a truthiness check
+    // sails straight past a torn-down editor and throws. `isDestroyed` reads
+    // `!view?.docView`, which is the check that actually holds.
+    const dispatch = vi.fn();
+    const destroyed = {
+      isDestroyed: true,
+      view: { dispatch },
+      // Walkable, because a quoted thread asks the document whether its
+      // passage is still there.
+      state: {
+        tr: { setMeta: () => ({}) },
+        selection: { from: 0, to: 0 },
+        doc: { descendants: () => {} },
+      },
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+    listComments.mockResolvedValue([thread({ quote: "something" })]);
+
+    panel({ editor: destroyed as never });
+
+    expect(await screen.findByText("Is this right?")).toBeInTheDocument();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("dispatches its anchors into a live editor", async () => {
+    const dispatch = vi.fn();
+    const live = {
+      isDestroyed: false,
+      view: { dispatch },
+      // Walkable, because a quoted thread asks the document whether its
+      // passage is still there.
+      state: {
+        tr: { setMeta: () => ({}) },
+        selection: { from: 0, to: 0 },
+        doc: { descendants: () => {} },
+      },
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+    listComments.mockResolvedValue([thread({ quote: "something" })]);
+
+    panel({ editor: live as never });
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
+  });
+
   it("reports a failure to load rather than looking empty", async () => {
     listComments.mockRejectedValue(new ApiError(500, "boom"));
 

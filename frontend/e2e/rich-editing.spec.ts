@@ -204,3 +204,39 @@ test("the table controls are absent outside a table", async ({ page }) => {
 
   await expect(page.getByRole("toolbar", { name: "Table" })).toBeHidden();
 });
+
+test("history shows what changed, not just what it said", async ({ page }) => {
+  test.slow();
+
+  await signUp(page, uniqueEmail("diff"));
+  await newDocument(page);
+
+  await page.getByRole("textbox", { name: /document body/i }).click();
+  await page.keyboard.type("the quick brown fox");
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  // A second author-changing edit is not needed: the first save creates the
+  // document's first version, and this edit is what the diff compares against.
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("the slow purple fox indeed");
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  await page.getByRole("button", { name: /^history$/i }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: /ago|just now/i }).first().click();
+
+  await dialog.getByRole("tab", { name: /changes/i }).click();
+
+  // Additions only, and that is the product working rather than a gap in the
+  // test. Phase 3 snapshots the state BEFORE a save and writes at most one
+  // version per author per five minutes, so a document created and edited
+  // inside one minute has exactly one version: the empty original. Everything
+  // since is an addition. Asserting a removal here would be asserting that
+  // version history behaves differently than it does.
+  await expect(dialog.locator("ins").first()).toBeVisible();
+  await expect(dialog.getByText(/\d+ added/)).toBeVisible();
+
+  // Marked with an element rather than colour alone, which is what makes the
+  // diff readable for someone with a colour vision deficiency.
+  await expect(dialog.locator("ins").first()).toContainText(/fox|slow|purple/);
+});

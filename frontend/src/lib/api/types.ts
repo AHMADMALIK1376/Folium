@@ -31,9 +31,18 @@ export interface SearchResults {
   results: SearchResult[];
 }
 
+/** A document in a list, with whether this person starred it.
+ *
+ * Carried on the list rather than fetched separately: the dashboard used to
+ * make a second authenticated call for stars, and each one costs a database
+ * round trip of roughly half a second against a hosted Postgres. */
+export interface DocumentListItem extends DocumentSummary {
+  starred: boolean;
+}
+
 export interface DocumentListResponse {
-  owned: DocumentSummary[];
-  shared: DocumentSummary[];
+  owned: DocumentListItem[];
+  shared: DocumentListItem[];
 }
 
 /** A TipTap document node tree.
@@ -66,6 +75,23 @@ export interface Share {
    *  client does not recognise must display as-is rather than crash. */
   permission: string;
   created_at: string;
+}
+
+/** One run of text in a diff, and what happened to it. */
+export interface DiffSegment {
+  op: "equal" | "added" | "removed";
+  text: string;
+}
+
+/** What changed between a version and the document as it stands.
+ *
+ * The counts answer the question most of the time — "12 words added, 4
+ * removed" is usually the whole answer — and the segments are for when it is
+ * not. */
+export interface VersionDiff {
+  added: number;
+  removed: number;
+  segments: DiffSegment[];
 }
 
 export interface VersionSummary {

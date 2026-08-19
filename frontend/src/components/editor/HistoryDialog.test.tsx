@@ -8,10 +8,14 @@ import type { VersionSummary } from "@/lib/api/types";
 const listVersions = vi.fn();
 const getVersion = vi.fn();
 const restoreVersion = vi.fn();
+const diffVersion = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   listVersions: (...a: unknown[]) => listVersions(...a),
   getVersion: (...a: unknown[]) => getVersion(...a),
   restoreVersion: (...a: unknown[]) => restoreVersion(...a),
+  // Selecting a version now fetches its content and its diff together, so a
+  // mock missing this leaves the pane empty and every assertion below fails.
+  diffVersion: (...a: unknown[]) => diffVersion(...a),
 }));
 
 const { HistoryDialog } = await import("./HistoryDialog");
@@ -47,6 +51,7 @@ describe("HistoryDialog", () => {
     vi.clearAllMocks();
     listVersions.mockResolvedValue([version()]);
     getVersion.mockResolvedValue({ ...version(), content: doc("An earlier draft") });
+    diffVersion.mockResolvedValue({ added: 0, removed: 0, segments: [] });
   });
 
   it("lists versions with their author and age", async () => {

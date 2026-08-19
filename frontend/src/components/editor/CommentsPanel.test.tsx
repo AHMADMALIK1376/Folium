@@ -9,11 +9,14 @@ const listComments = vi.fn();
 const createComment = vi.fn();
 const updateComment = vi.fn();
 const deleteComment = vi.fn();
+const listShares = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   listComments: (...a: unknown[]) => listComments(...a),
   createComment: (...a: unknown[]) => createComment(...a),
   updateComment: (...a: unknown[]) => updateComment(...a),
   deleteComment: (...a: unknown[]) => deleteComment(...a),
+  // The mention picker asks who can see the document.
+  listShares: (...a: unknown[]) => listShares(...a),
 }));
 
 const { CommentsPanel } = await import("./CommentsPanel");
@@ -59,6 +62,7 @@ beforeEach(() => {
   createComment.mockResolvedValue(thread());
   updateComment.mockResolvedValue(thread());
   deleteComment.mockResolvedValue(undefined);
+  listShares.mockResolvedValue([]);
 });
 
 describe("CommentsPanel", () => {
@@ -102,6 +106,7 @@ describe("CommentsPanel", () => {
       quote: null,
       prefix: null,
       suffix: null,
+      mention_user_ids: [],
     });
   });
 

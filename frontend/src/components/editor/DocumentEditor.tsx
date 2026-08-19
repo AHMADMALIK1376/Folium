@@ -347,6 +347,9 @@ function DocumentEditorSurface({
         permission={document.permission}
         currentUserId={collab.user?.id ?? null}
         editor={editor}
+        // The owner is mentionable and is not in the share list, so the panel
+        // cannot work them out on its own.
+        owner={document.owner}
         openComment={openComment}
         onOpenedComment={() => setOpenComment(null)}
       />

@@ -32,6 +32,14 @@ export async function apiFetch<T>(
   const base = process.env.NEXT_PUBLIC_API_URL ?? "";
   const response = await fetch(`${base}${path}`, {
     ...init,
+    // Never from the browser cache. Every response here is per-user and
+    // mutable, and FastAPI sends no Cache-Control, which leaves Chrome free to
+    // apply heuristic freshness and hand back a stale body. That surfaced as a
+    // notification count of 0 on a page that had asked once before and been
+    // told 0 — the bell staying silent about something that had already
+    // happened. serverApiFetch has said no-store since 2C-i for the same
+    // reason; this is the half that was missed.
+    cache: "no-store",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...init.headers,

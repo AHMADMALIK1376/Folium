@@ -45,6 +45,7 @@ share them with other people.
 | [12](docs/superpowers/specs/2026-08-17-phase-12-inline-images-design.md) | Images inline in the document, served from a stable URL | Done |
 | [13](docs/superpowers/specs/2026-08-17-phase-13-folders-design.md) | Folders: organisation, not access | Done |
 | [14](docs/superpowers/specs/2026-08-20-phase-14-comments-design.md) | Comments, anchored to a passage — and the `comment` permission finally means something | Done |
+| [15](docs/superpowers/specs/2026-08-20-phase-15-notifications-design.md) | Notifications and mentions | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -77,6 +78,9 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
   revoke it. The dashboard separates documents you own from documents shared with you.
 - **Comment on a document, or on a passage inside it** — reply, resolve, reopen. A commenter can
   join the discussion without being able to change a word of the document.
+- **Be told when it happens.** A bell in the header counts what you have not read: comments on your
+  documents, replies to your threads, mentions of you, and documents shared with you. Type `@` in a
+  comment to address someone who can already see the document.
 - Edit a document with someone else at the same time, seeing their cursor and their text as they
   type — when a collaboration server is configured.
 - Browse a document's version history, preview an earlier draft, **see exactly what changed**, and
@@ -401,6 +405,44 @@ Two smaller rules worth knowing:
 - **A discussion outlives the account that took part in it.** `author_id` is `ON DELETE SET NULL`,
   and a comment from a deleted account renders as "Unknown" rather than vanishing.
 
+## Notifications and mentions
+
+A bell in the header counts what you have not read. Four things reach it, and nothing else:
+
+| Event | Who hears |
+|---|---|
+| A comment on a document | Its owner |
+| A reply to a thread | Whoever started the thread |
+| A mention in a comment | The person mentioned |
+| A document is shared with you | You |
+
+**Never yourself.** Commenting on your own document, replying to your own thread and mentioning
+yourself all produce nothing.
+
+**One event, one notification.** A reply that also mentions the thread's author is a mention and not
+both, because "Ada mentioned you" says everything "Ada replied" says and more.
+
+Nothing is sent for edits, resolutions, deletions or filings. Each is either routine or already
+known to whoever did it, and a list that fills with things nobody wanted is one people stop reading —
+at which point the four that matter are lost with the rest.
+
+**A notification never outlives the access it was created under.** The row holds a document title,
+so one written while a document was shared with you and read after your share was revoked would leak
+it. Every read re-checks access rather than relying on a cleanup job at revocation time, because a
+cleanup job fails silently the first time someone adds another way to lose access.
+
+Type `@` in a comment to address someone. The picker offers only people who can already see the
+document — anyone else would be either a leak or a promise of a link they cannot open — and mentions
+are recorded as rows rather than scraped back out of the text, because display names contain spaces
+and "where does `@Ada Lovelace` end?" has no reliable answer. Delete the `@Ada` from your text before
+posting and the mention goes with it.
+
+**Delivery is polling, once a minute**, and that is a decision rather than a shortcut. The
+collaboration server exists but is per-document and optional; a second realtime system would be a
+second thing to operate, deploy and debug for a feature whose whole requirement is "within a minute
+is fine". The count also refreshes immediately after anything that could change it, so the common
+case never waits for a tick.
+
 ## Repository layout
 
 ```
@@ -475,8 +517,17 @@ DEPLOY.md               deployment guide
 - **A comment's anchor is a quote, not a position.** It survives edits elsewhere in the document,
   and when its own passage is rewritten the comment says so rather than reattaching to whatever text
   is nearest. See the Comments section for why every other option was worse.
-- **Comments are plain text, with no mentions or notifications.** Both need an addressing model this
-  app does not have.
+- **Notifications are in-app only.** No email: it needs a sending service, deliverability,
+  templates and an unsubscribe story, none of which is a notification feature — it is a mail feature
+  wearing one.
+- **Notifications arrive by polling, once a minute.** The collaboration server exists but is
+  per-document and optional; a second realtime system would be a second thing to operate for a
+  feature whose whole requirement is "within a minute is fine".
+- **You can only mention people who can already see the document.** Anyone else would be either a
+  leak or a promise of a link they cannot open, and the backend refuses rather than silently
+  dropping the mention.
+- **No per-kind preferences, digests or muting**, and nothing is sent for edits, resolutions or
+  deletions — each is either routine or already known to whoever did it.
 - **A comment cannot be reattached by hand** once its passage is gone.
 
 ## Development

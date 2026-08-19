@@ -136,8 +136,9 @@ from.
 
 ## The data model, and what changed
 
-Five tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`. The full
-DDL is in the spec. The changes that matter:
+Seven tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
+`document_stars` and `folders` — the last two added in Phases 8 and 13. The full DDL is in the spec.
+The changes that matter:
 
 **`content` becomes `jsonb` instead of an HTML string.** The most consequential change. v1 stores
 rendered HTML; TipTap's native format is JSON, with HTML as one possible export. Storing JSON means
@@ -167,6 +168,12 @@ Supabase auth ids; real timestamps sort correctly across timezones.
 
 **Attachments store a path, not bytes.** v1 keeps file bytes in a `BLOB` column, which bloats the
 database, slows backups, and burns the free-tier storage quota. Files belong in Supabase Storage.
+
+**A `folders` table, and `documents.folder_id` as `ON DELETE SET NULL`.** The null is the design.
+Cascading would make reorganising destructive — deleting a folder would delete work — and the app
+already has a trash for deletion. A folder is unique per `(owner_id, name)`, holds only documents its
+owner owns, and does not nest: it is a label, never a gate, so nothing about it participates in an
+access decision.
 
 ## Error handling
 

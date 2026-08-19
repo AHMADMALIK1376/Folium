@@ -47,6 +47,7 @@ async def list_documents(db: DbSession, user: CurrentUser) -> DocumentListOut:
         return DocumentListItem(
             **DocumentSummary.model_validate(document).model_dump(),
             starred=document.id in starred,
+            folder_id=document.folder_id,
         )
 
     return DocumentListOut(

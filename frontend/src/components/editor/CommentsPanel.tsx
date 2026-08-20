@@ -99,9 +99,12 @@ export function CommentsPanel({
     }
   }, [documentId, writable, owner, currentUserId]);
 
-  useEffect(() => {
-    void loadPeople();
-  }, [loadPeople]);
+  // Deliberately NOT loaded on mount. The list is only ever read by the
+  // mention picker, which cannot open until someone focuses the compose box —
+  // and `onCompose` already refreshes it then, because shares change while a
+  // document is open. Fetching it eagerly cost every reader of every document a
+  // request they would probably never use, on a page that already makes
+  // several and pays roughly 600ms for each.
 
   // Hold the last passage the reader selected, rather than reading the
   // selection when the comment is submitted: clicking into the box moves focus,

@@ -44,11 +44,18 @@ async def dispose_engine():
 
 @pytest.fixture(autouse=True)
 def _test_auth(monkeypatch):
+    from app.api.deps import forget_cached_users
     from app.config import settings
     from app.core import jwks as jwks_module
     from tests.keys import jwks_document
 
     monkeypatch.setattr(settings, "supabase_url", "https://test.supabase.co")
+
+    # Resolved users are cached in process for a minute, so a case that reuses
+    # an email from a previous one would otherwise be served a user the
+    # database no longer has — and a case asserting on a *changed* profile
+    # would see the old one.
+    forget_cached_users()
 
     async def fetcher():
         return jwks_document()
@@ -57,3 +64,4 @@ def _test_auth(monkeypatch):
     jwks_module.jwks_cache.clear()
     yield
     jwks_module.jwks_cache.clear()
+    forget_cached_users()

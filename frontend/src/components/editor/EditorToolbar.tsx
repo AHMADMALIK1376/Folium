@@ -4,6 +4,7 @@ import type { Editor } from "@tiptap/react";
 
 import { ImageButton } from "@/components/editor/ImageButton";
 import { LinkDialog } from "@/components/editor/LinkDialog";
+import { changeCase } from "@/lib/editor/document";
 import { cn } from "@/lib/utils";
 
 /** One formatting control.
@@ -146,6 +147,7 @@ export function EditorToolbar({
       >
         <span className="text-xs">A&#x0338;</span>
       </ToolbarButton>
+      <ChangeCaseButton editor={editor} />
 
       <Divider />
 
@@ -232,5 +234,61 @@ export function EditorToolbar({
         ☑
       </ToolbarButton>
     </div>
+  );
+}
+
+/** Word's Change Case, cycling upper → lower → title.
+ *
+ * One button rather than a menu: three items behind a dropdown is more clicks
+ * than pressing one button up to three times, and the result is visible
+ * immediately so cycling is self-explanatory.
+ *
+ * Disabled without a selection, because "change the case of nothing" has no
+ * meaning and a control that silently does nothing is worse than one that says
+ * it cannot.
+ */
+function ChangeCaseButton({ editor }: { editor: Editor }) {
+  const { from, to } = editor.state.selection;
+  const hasSelection = to > from;
+
+  const apply = () => {
+    const { from, to } = editor.state.selection;
+    if (to <= from) return;
+
+    const text = editor.state.doc.textBetween(from, to, "\n");
+    const next =
+      text === text.toUpperCase()
+        ? "lower"
+        : text === text.toLowerCase()
+          ? "title"
+          : "upper";
+
+    // insertContentAt rather than a mark: case is the text, not a decoration on
+    // it, so this genuinely rewrites the characters — and the selection is kept
+    // so the button can be pressed again to cycle.
+    editor
+      .chain()
+      .focus()
+      .insertContentAt({ from, to }, changeCase(text, next))
+      .setTextSelection({ from, to: from + text.length })
+      .run();
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Change case"
+      title="Change case (upper, lower, title)"
+      disabled={!hasSelection}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={apply}
+      className={cn(
+        "flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md px-1.5 text-sm transition-colors",
+        "hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-carmine-500 focus-visible:outline-none",
+        "text-neutral-600 disabled:opacity-40 disabled:hover:bg-transparent",
+      )}
+    >
+      <span className="text-xs">Aa</span>
+    </button>
   );
 }

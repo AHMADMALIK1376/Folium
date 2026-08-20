@@ -168,7 +168,7 @@ describe("DocumentEditor", () => {
   it("starts out saying the document is saved", () => {
     render(<DocumentEditor document={makeDocument("owner")} />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/saved/i);
+    expect(screen.getByRole("status", { name: /save status/i })).toHaveTextContent(/saved/i);
   });
 
   it("saves a renamed title", async () => {
@@ -213,7 +213,9 @@ describe("DocumentEditor", () => {
 
     const alert = await screen.findByRole("alert", {}, { timeout: 3000 });
     expect(alert).toHaveTextContent(/could not save/i);
-    expect(screen.getByRole("status")).not.toHaveTextContent(/^saved$/i);
+    expect(screen.getByRole("status", { name: /save status/i })).not.toHaveTextContent(
+      /^saved$/i,
+    );
   });
 
   it("tells a signed-out user to sign in again rather than to retry", async () => {
@@ -232,7 +234,10 @@ describe("DocumentEditor", () => {
   it("announces save status changes to a screen reader", () => {
     render(<DocumentEditor document={makeDocument("owner")} />);
 
-    expect(screen.getByRole("status")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("status", { name: /save status/i })).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
   });
 });
 

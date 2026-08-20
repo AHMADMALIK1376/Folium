@@ -234,6 +234,28 @@ describe("NotificationBell", () => {
     vi.useRealTimers();
   });
 
+  it("recovers when the request hangs rather than fails", async () => {
+    // The failure a Playwright trace caught: apiFetch asks Supabase for a
+    // session first, and that call can hang on a lock another tab holds. A hung
+    // promise neither resolves nor rejects, so nothing schedules a retry and
+    // the bell stays silent for the life of the page.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    unreadNotificationCount.mockReturnValueOnce(new Promise(() => {}));
+    unreadNotificationCount.mockResolvedValue({ count: 4 });
+
+    render(<NotificationBell />);
+    await waitFor(() => expect(unreadNotificationCount).toHaveBeenCalledTimes(1));
+
+    // Past the timeout, and past the retry that the timeout makes possible.
+    await vi.advanceTimersByTimeAsync(8_100);
+    await vi.advanceTimersByTimeAsync(3_100);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /4 unread/i })).toBeInTheDocument(),
+    );
+    vi.useRealTimers();
+  });
+
   it("does not hammer the server once it is working", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     unreadNotificationCount.mockResolvedValue({ count: 0 });

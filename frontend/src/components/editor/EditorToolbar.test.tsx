@@ -40,6 +40,13 @@ function makeEditor(active: string[] = []) {
       chain: () => chain,
       isActive: (name: string, attrs?: Record<string, number>) =>
         active.includes(attrs ? `${name}:${attrs.level}` : name),
+      // Change Case asks whether there is a selection to change: without one
+      // there is nothing to do, and the button says so rather than doing
+      // nothing quietly.
+      state: {
+        selection: { from: 0, to: 0 },
+        doc: { textBetween: () => "" },
+      },
     },
   };
 }

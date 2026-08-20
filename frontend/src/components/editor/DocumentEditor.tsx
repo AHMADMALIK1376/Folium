@@ -8,15 +8,20 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiErrorMessage } from "@/components/documents/ApiErrorMessage";
+import { Button } from "@/components/ui/button";
 import { ShareDialog } from "@/components/documents/ShareDialog";
 import { AttachmentsPanel } from "@/components/editor/AttachmentsPanel";
 import { CommentsPanel } from "@/components/editor/CommentsPanel";
+import { DocumentOutline } from "@/components/editor/DocumentOutline";
+import { DocumentStats } from "@/components/editor/DocumentStats";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
+import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
 import { FormattingControls } from "@/components/editor/FormattingControls";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
+import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { SlashMenu } from "@/components/editor/SlashMenu";
 import { TableControls } from "@/components/editor/TableControls";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
@@ -27,6 +32,7 @@ import { cursorColor } from "@/lib/collab/color";
 import { decideOnSync } from "@/lib/collab/reconcile";
 import { useCollaboration } from "@/lib/collab/useCollaboration";
 import { CommentHighlights } from "@/lib/editor/commentHighlights";
+import { FindReplace } from "@/lib/editor/findReplace";
 import { baseExtensions } from "@/lib/editor/extensions";
 import { useAutosave } from "@/lib/hooks/useAutosave";
 
@@ -60,6 +66,8 @@ function DocumentEditorSurface({
   // Set when a highlight in the document is clicked, so the panel can bring
   // that thread to the reader rather than making them find it.
   const [openComment, setOpenComment] = useState<string | null>(null);
+  // Raised by Ctrl+F and by the Find button. Held here because both need it.
+  const [finding, setFinding] = useState(false);
 
   const save = useCallback(
     async (patch: DocumentPatch, init?: RequestInit) => {
@@ -93,6 +101,10 @@ function DocumentEditorSurface({
       // that never touches content, which is exactly why a commenter who may
       // not write the document can still see and make them.
       CommentHighlights.configure({ onSelect: (id) => setOpenComment(id) }),
+      // Also outside baseExtensions, and for the same reason: find draws
+      // decorations and contributes no nodes or marks. Searching a document
+      // must not be able to change it, and a decoration cannot.
+      FindReplace,
       ...(collab.enabled && collab.doc
         ? [
             Collaboration.configure({ document: collab.doc }),
@@ -268,6 +280,15 @@ function DocumentEditorSurface({
         {/* Offered whatever the permission: exporting is reading. */}
         <ExportDialog documentId={document.id} content={editor?.getJSON()} />
 
+        {/* A visible way in. Ctrl+F is the shortcut people already have, but
+            it is the browser's shortcut being taken over — nobody would guess
+            this app has its own unless it says so. */}
+        <Button variant="ghost" size="sm" onClick={() => setFinding(true)}>
+          Find
+        </Button>
+
+        <ShortcutsDialog />
+
         <HistoryDialog
           documentId={document.id}
           canEdit={editable}
@@ -321,6 +342,18 @@ function DocumentEditorSurface({
         {title}
       </h1>
 
+      {/* Above the toolbar, where a find bar belongs, and offered at every
+          permission: finding is reading. Replace is the bar's own decision. */}
+      <FindReplaceBar
+        editor={editor}
+        canEdit={editable}
+        open={finding}
+        onOpenChange={setFinding}
+      />
+
+      {/* Hides itself when the document has no headings. */}
+      <DocumentOutline editor={editor} />
+
       {editor && editable && <EditorToolbar editor={editor} documentId={document.id} />}
       {editor && editable && <FormattingControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
@@ -331,6 +364,8 @@ function DocumentEditorSurface({
         <EditorContent editor={editor} />
         {editor && editable && <SlashMenu editor={editor} />}
       </div>
+
+      <DocumentStats editor={editor} />
 
       {/* Absent entirely when the deployment has no storage key, rather than an
           empty state or an error: an unconfigured feature is not a broken one,

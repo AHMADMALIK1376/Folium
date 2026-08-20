@@ -5,6 +5,7 @@ import type {
   AttachmentUrl,
   CollabSession,
   DocumentDetail,
+  AppNotification,
   Comment,
   CommentThread,
   Folder,
@@ -333,6 +334,12 @@ export function listComments(documentId: string): Promise<CommentThread[]> {
 
 export interface NewComment {
   body: string;
+  /** Who the comment addressed, said outright rather than left for the server
+   *  to scrape out of the body — display names contain spaces, so there is no
+   *  reliable way to parse where `@Ada Lovelace` ends. Everyone named must
+   *  already have access; the backend refuses with 422 rather than silently
+   *  dropping a mention the sender believes they sent. */
+  mention_user_ids?: string[];
   /** Absent for a comment on the document as a whole. */
   quote?: string | null;
   prefix?: string | null;
@@ -369,5 +376,29 @@ export function updateComment(
 export function deleteComment(documentId: string, commentId: string): Promise<void> {
   return apiFetch<void>(`/api/v1/documents/${documentId}/comments/${commentId}`, {
     method: "DELETE",
+  });
+}
+
+/** This person's notifications, newest first.
+ *
+ * Access is re-checked server-side on every read, so a notification about a
+ * document that is no longer shared with you simply does not come back. */
+export function listNotifications(): Promise<AppNotification[]> {
+  return apiFetch<AppNotification[]>("/api/v1/notifications");
+}
+
+/** Just the number on the bell. Its own route because it is asked on every page
+ *  load and every poll, and must not carry fifty rows to answer with one
+ *  integer. */
+export function unreadNotificationCount(): Promise<{ count: number }> {
+  return apiFetch<{ count: number }>("/api/v1/notifications/unread-count");
+}
+
+/** Mark notifications read, or all of them when `ids` is omitted. Returns the
+ *  count that remains, so the caller need not ask again. */
+export function markNotificationsRead(ids?: string[]): Promise<{ count: number }> {
+  return apiFetch<{ count: number }>("/api/v1/notifications/read", {
+    method: "POST",
+    body: JSON.stringify(ids === undefined ? {} : { ids }),
   });
 }

@@ -7,6 +7,7 @@ from app.api.v1 import (
     documents,
     export,
     folders,
+    notifications,
     search,
     shares,
     stars,
@@ -18,6 +19,7 @@ from app.api.v1 import (
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(users.router)
 api_router.include_router(folders.router)
+api_router.include_router(notifications.router)
 api_router.include_router(uploads.router)
 # Before documents.router, and that ordering matters: /documents/{document_id}
 # would otherwise capture /documents/search and reject it as a bad UUID.

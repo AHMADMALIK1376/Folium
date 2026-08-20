@@ -203,3 +203,26 @@ export interface Comment {
 export interface CommentThread extends Comment {
   replies: Comment[];
 }
+
+/** What a notification is about.
+ *
+ * Four kinds and no others — not edits, resolutions, deletions or filings, each
+ * of which is either routine or already known to whoever did it. A list that
+ * fills with things nobody wanted is one people stop reading. */
+export type NotificationKind = "comment" | "reply" | "mention" | "share";
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  document_id: string;
+  /** Carried on the row so a bell listing ten notifications is not eleven
+   *  requests. */
+  document_title: string;
+  comment_id: string | null;
+  actor_id: string | null;
+  /** Null when the actor's account was deleted — "someone commented" is still
+   *  true after they are gone. */
+  actor_name: string | null;
+  read_at: string | null;
+  created_at: string;
+}

@@ -30,6 +30,15 @@ class CommentCreate(BaseModel):
     prefix: str | None = Field(default=None, max_length=CONTEXT_MAX)
     suffix: str | None = Field(default=None, max_length=CONTEXT_MAX)
     parent_id: uuid.UUID | None = None
+    # Who this comment addressed, said outright rather than scraped from the
+    # body. Parsing would have to answer where `@Ada Lovelace` ends, and display
+    # names contain spaces, so there is no reliable answer. The client picked
+    # these people from a list; it already knows.
+    #
+    # Input only — CommentOut does not echo it back. The body already carries
+    # the readable form, "@Ada Lovelace", so returning the ids would add a query
+    # per read to tell the client something it can see.
+    mention_user_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
 
     @field_validator("body")
     @classmethod

@@ -9,11 +9,14 @@ const listComments = vi.fn();
 const createComment = vi.fn();
 const updateComment = vi.fn();
 const deleteComment = vi.fn();
+const listShares = vi.fn();
 vi.mock("@/lib/api/documents", () => ({
   listComments: (...a: unknown[]) => listComments(...a),
   createComment: (...a: unknown[]) => createComment(...a),
   updateComment: (...a: unknown[]) => updateComment(...a),
   deleteComment: (...a: unknown[]) => deleteComment(...a),
+  // The mention picker asks who can see the document.
+  listShares: (...a: unknown[]) => listShares(...a),
 }));
 
 const { CommentsPanel } = await import("./CommentsPanel");
@@ -59,6 +62,7 @@ beforeEach(() => {
   createComment.mockResolvedValue(thread());
   updateComment.mockResolvedValue(thread());
   deleteComment.mockResolvedValue(undefined);
+  listShares.mockResolvedValue([]);
 });
 
 describe("CommentsPanel", () => {
@@ -102,6 +106,7 @@ describe("CommentsPanel", () => {
       quote: null,
       prefix: null,
       suffix: null,
+      mention_user_ids: [],
     });
   });
 
@@ -243,6 +248,56 @@ describe("CommentsPanel", () => {
     panel();
 
     expect(await screen.findByText(/the budget constraint/)).toBeInTheDocument();
+  });
+
+  it("does not dispatch into a torn-down editor", async () => {
+    // The lifecycle trap, pinned. TipTap builds the view in the Editor
+    // constructor, so an editor never exists without one — but `destroy()`
+    // destroys the view and *leaves `editor.view` set*, so a truthiness check
+    // sails straight past a torn-down editor and throws. `isDestroyed` reads
+    // `!view?.docView`, which is the check that actually holds.
+    const dispatch = vi.fn();
+    const destroyed = {
+      isDestroyed: true,
+      view: { dispatch },
+      // Walkable, because a quoted thread asks the document whether its
+      // passage is still there.
+      state: {
+        tr: { setMeta: () => ({}) },
+        selection: { from: 0, to: 0 },
+        doc: { descendants: () => {} },
+      },
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+    listComments.mockResolvedValue([thread({ quote: "something" })]);
+
+    panel({ editor: destroyed as never });
+
+    expect(await screen.findByText("Is this right?")).toBeInTheDocument();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it("dispatches its anchors into a live editor", async () => {
+    const dispatch = vi.fn();
+    const live = {
+      isDestroyed: false,
+      view: { dispatch },
+      // Walkable, because a quoted thread asks the document whether its
+      // passage is still there.
+      state: {
+        tr: { setMeta: () => ({}) },
+        selection: { from: 0, to: 0 },
+        doc: { descendants: () => {} },
+      },
+      on: vi.fn(),
+      off: vi.fn(),
+    };
+    listComments.mockResolvedValue([thread({ quote: "something" })]);
+
+    panel({ editor: live as never });
+
+    await waitFor(() => expect(dispatch).toHaveBeenCalled());
   });
 
   it("reports a failure to load rather than looking empty", async () => {

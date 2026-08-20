@@ -13,8 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core.exceptions import NotFoundError, PermissionDeniedError, ValidationError
-from app.models import Comment, User
+from app.models import Comment, CommentMention, User
 from app.schemas.comment import CommentCreate, CommentUpdate
+from app.services import notifications
 from app.services.documents import get_document
 from app.services.permissions import Permission, can_comment
 
@@ -94,13 +95,18 @@ async def _comment_for(
 async def create_comment(
     db: AsyncSession, document_id: UUID, user: User, data: CommentCreate
 ) -> Authored:
-    permission = await _document_access(db, document_id, user.id)
+    document, permission = await get_document(db, document_id, user.id)
 
     if not can_comment(permission):
         raise PermissionDeniedError("You do not have permission to comment on this document")
 
     if data.parent_id is not None:
         await _check_reply(db, document_id, data)
+
+    # Checked before the comment is written, so a mention of someone without
+    # access fails the whole request rather than posting a comment whose
+    # addressee will never hear about it.
+    mentioned = await notifications.resolve_mentions(db, document_id, data.mention_user_ids)
 
     comment = Comment(
         document_id=document_id,
@@ -113,6 +119,18 @@ async def create_comment(
         suffix=data.suffix if data.quote else None,
     )
     db.add(comment)
+    # The comment needs an id before anything can point at it, and this keeps
+    # the mentions and notifications in the same transaction: there is no moment
+    # where the comment exists and the people it addressed have not been told.
+    await db.flush()
+
+    for user_id in mentioned:
+        db.add(CommentMention(comment_id=comment.id, user_id=user_id))
+
+    await notifications.for_new_comment(
+        db, comment=comment, document=document, actor_id=user.id, mentioned=mentioned
+    )
+
     await db.commit()
     await db.refresh(comment)
 

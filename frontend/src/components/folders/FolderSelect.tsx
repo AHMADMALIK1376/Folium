@@ -58,9 +58,9 @@ export function FolderSelect({
       aria-label="Folder"
       title={failed ? "Could not move the document" : "Folder"}
       className={cn(
-        // Narrower on a phone: this row also holds a star and a delete button, and
-        // at 375px a 9rem select leaves the title almost nothing.
-        "h-7 max-w-[5.5rem] shrink-0 truncate rounded-md border border-neutral-200 bg-white px-1.5 text-xs text-neutral-600 sm:max-w-[9rem]",
+        // The card stacks below sm, so this gets its own row on a phone and does
+        // not have to be squeezed to leave the title something.
+        "h-7 max-w-[9rem] shrink-0 truncate rounded-md border border-neutral-200 bg-white px-1.5 text-xs text-neutral-600",
         "transition-colors hover:border-neutral-300 focus-visible:ring-2 focus-visible:ring-carmine-500 focus-visible:outline-none",
         "disabled:opacity-60",
         failed && "border-carmine-500 text-carmine-700",

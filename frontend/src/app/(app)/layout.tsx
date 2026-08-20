@@ -5,6 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Sidebar } from "@/components/Sidebar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { StaleSessionGuard } from "@/components/auth/StaleSessionGuard";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getFolders } from "@/lib/api/server";
 import type { Folder } from "@/lib/api/types";
 
@@ -35,6 +36,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Logo size="sm" />
           </Link>
           <div className="flex items-center gap-4">
+            {/* Before the account link, because it is the thing that changes. */}
+            <NotificationBell />
             <Link href="/account" className="text-sm text-neutral-500 hover:text-carmine-500">
               Account
             </Link>

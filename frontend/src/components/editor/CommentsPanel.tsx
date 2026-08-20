@@ -9,14 +9,17 @@ import {
   createComment,
   deleteComment,
   listComments,
+  listShares,
   updateComment,
 } from "@/lib/api/documents";
-import type { Comment, CommentThread, Permission } from "@/lib/api/types";
+import type { Comment, CommentThread, Permission, UserProfile } from "@/lib/api/types";
 import { describeSelection, locate, type Anchor } from "@/lib/editor/anchors";
 import {
   SET_COMMENT_ANCHORS,
   type CommentAnchor,
 } from "@/lib/editor/commentHighlights";
+import { MentionField, mentionedIn, type Mentionable } from "./MentionField";
+
 import { cn } from "@/lib/utils";
 
 /** Who may write here.
@@ -43,6 +46,7 @@ export function CommentsPanel({
   permission,
   currentUserId,
   editor,
+  owner,
   openComment,
   onOpenedComment,
 }: {
@@ -50,6 +54,8 @@ export function CommentsPanel({
   permission: Permission;
   currentUserId: string | null;
   editor: Editor | null;
+  /** The document's owner, who is mentionable and is not in the share list. */
+  owner?: UserProfile;
   /** A thread the reader asked for by clicking its highlight in the document. */
   openComment?: string | null;
   onOpenedComment?: () => void;
@@ -59,6 +65,7 @@ export function CommentsPanel({
   const [selection, setSelection] = useState<Anchor | null>(null);
   const [showResolved, setShowResolved] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
+  const [people, setPeople] = useState<Mentionable[]>([]);
   const writable = canComment(permission);
 
   const load = useCallback(async () => {
@@ -72,6 +79,29 @@ export function CommentsPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Who can be addressed: the owner plus everyone the document is shared with,
+  // minus yourself. Only for people who can actually write, so a viewer does
+  // not pay a request for a picker they will never see.
+  const loadPeople = useCallback(async () => {
+    if (!writable) return;
+
+    try {
+      const shares = await listShares(documentId);
+      const all: Mentionable[] = [
+        ...(owner ? [{ id: owner.id, display_name: owner.display_name }] : []),
+        ...shares.map((s) => ({ id: s.user_id, display_name: s.display_name })),
+      ];
+      setPeople(all.filter((person) => person.id !== currentUserId));
+    } catch {
+      // A picker that cannot be populated simply does not appear. Commenting
+      // still works, which is the part that matters.
+    }
+  }, [documentId, writable, owner, currentUserId]);
+
+  useEffect(() => {
+    void loadPeople();
+  }, [loadPeople]);
 
   // Hold the last passage the reader selected, rather than reading the
   // selection when the comment is submitted: clicking into the box moves focus,
@@ -109,11 +139,15 @@ export function CommentsPanel({
   // meta changes no content — which is the point, and the reason a viewer sees
   // highlights on a document they cannot write to.
   //
-  // The view guard is not defensive noise: a TipTap editor exists for a moment
-  // before its view is attached and again after it is torn down, and
-  // dispatching in either window throws. The editor's own test suite caught it.
+  // `isDestroyed` is the guard that matters, and it is worth saying exactly
+  // what it guards. TipTap builds the view inside the Editor constructor, so
+  // there is no window where an editor exists without one. `destroy()` is the
+  // hazard: it destroys the view but leaves `editor.view` set, so a truthiness
+  // check would sail straight past a torn-down editor and throw on dispatch.
+  // `isDestroyed` reads `!view?.docView`, which is true in both cases — no
+  // view at all, and a view whose document was destroyed.
   useEffect(() => {
-    if (!editor || editor.isDestroyed || !editor.view) return;
+    if (!editor || editor.isDestroyed) return;
     editor.view.dispatch(editor.state.tr.setMeta(SET_COMMENT_ANCHORS, anchors));
   }, [editor, anchors]);
 
@@ -156,6 +190,11 @@ export function CommentsPanel({
       {writable && (
         <ComposeBox
           documentId={documentId}
+          people={people}
+          // Refreshed when someone starts composing, not only at mount. Shares
+          // change while a document is open — the owner adds a collaborator and
+          // then wants to mention them — and a list fetched once cannot know.
+          onCompose={loadPeople}
           anchor={selection}
           onClear={() => setSelection(null)}
           onPosted={() => {
@@ -228,14 +267,18 @@ export function CommentsPanel({
 
 function ComposeBox({
   documentId,
+  people,
   anchor,
   onClear,
   onPosted,
+  onCompose,
 }: {
   documentId: string;
+  people: Mentionable[];
   anchor: Anchor | null;
   onClear: () => void;
   onPosted: () => void;
+  onCompose: () => void;
 }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -253,6 +296,10 @@ function ComposeBox({
         quote: anchor?.quote ?? null,
         prefix: anchor?.prefix ?? null,
         suffix: anchor?.suffix ?? null,
+        // Read back out of the text rather than accumulated as they were
+        // picked: deleting "@Ada" has to remove the mention, or Ada is told
+        // about a comment that does not mention her.
+        mention_user_ids: mentionedIn(body, people),
       });
       setBody("");
       onPosted();
@@ -284,15 +331,14 @@ function ComposeBox({
           "On the whole document — select a passage to comment on it instead."
         )}
       </p>
-      <textarea
+      <MentionField
         value={body}
-        onChange={(event) => setBody(event.target.value)}
-        aria-label="Write a comment"
-        placeholder="Write a comment"
-        rows={2}
-        maxLength={5000}
+        onChange={setBody}
+        people={people}
+        label="Write a comment"
+        placeholder={people.length > 0 ? "Write a comment — @ to mention" : "Write a comment"}
         disabled={busy}
-        className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus-visible:border-carmine-500"
+        onCompose={onCompose}
       />
       {error != null && (
         <ApiErrorMessage error={error} fallback="Could not post the comment." />

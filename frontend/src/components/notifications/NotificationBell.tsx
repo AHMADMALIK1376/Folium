@@ -42,6 +42,26 @@ const RETRY_MS = 3_000;
  * that is blank for a few seconds on every cold load. */
 const NOT_READY_MS = 1_000;
 
+/** How long to wait for an answer before treating the attempt as failed.
+ *
+ * Not belt and braces. `apiFetch` asks the Supabase client for a session
+ * first, and that call can *hang* rather than fail — it takes a
+ * `navigator.locks` lock that is shared across every tab on the origin, so
+ * another tab refreshing a token can hold it. A hung promise neither resolves
+ * nor rejects, so without this the retry below is never scheduled and the bell
+ * stays silent for the life of the page. That is exactly what a Playwright
+ * trace showed: no request, and no second attempt either. */
+const TIMEOUT_MS = 8_000;
+
+function withTimeout<T>(work: Promise<T>): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("timed out")), TIMEOUT_MS),
+    ),
+  ]);
+}
+
 function sentence(notification: AppNotification): string {
   const who = notification.actor_name ?? "Someone";
 
@@ -87,7 +107,7 @@ export function NotificationBell() {
    *  wait returned here is what fixes the count. */
   const refreshCount = useCallback(async () => {
     try {
-      setCount((await unreadNotificationCount()).count);
+      setCount((await withTimeout(unreadNotificationCount())).count);
       setFailed(false);
       return POLL_MS;
     } catch (error) {

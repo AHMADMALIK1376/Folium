@@ -38,6 +38,10 @@ export interface SearchResults {
  * round trip of roughly half a second against a hosted Postgres. */
 export interface DocumentListItem extends DocumentSummary {
   starred: boolean;
+  /** A template is a document with a flag on it, not a separate kind of thing:
+   *  same editor, same list, same export. The flag only says "offer this when
+   *  starting something new". */
+  is_template: boolean;
   /** Null when unfiled. Only a document you own can be in a folder — folders
    *  are one person's organisation of their own work. */
   folder_id: string | null;
@@ -131,6 +135,7 @@ export interface DocumentDetail extends DocumentSummary {
    *  editor then omits the attachments panel rather than offering a control
    *  that would 503. */
   attachments_enabled: boolean;
+  is_template: boolean;
 }
 
 /** A file attached to a document.

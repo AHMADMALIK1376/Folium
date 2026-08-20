@@ -125,6 +125,13 @@ async def update_document(
         await folders.assert_can_file_into(db, data.folder_id, user_id)
         document.folder_id = data.folder_id
 
+    # Owner only. An editor may change what a document says; whether it is
+    # offered to everyone as a starting point is the owner's call.
+    if "is_template" in data.model_fields_set and data.is_template is not None:
+        if document.owner_id != user_id:
+            raise NotFoundError("Document not found")
+        document.is_template = data.is_template
+
     await db.commit()
     await db.refresh(document)
     return document, permission

@@ -13,6 +13,7 @@ from app.schemas.document import (
 )
 from app.schemas.user import UserOut
 from app.services import documents as service
+from app.services import duplication
 from app.services import stars as stars_service
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -29,6 +30,7 @@ async def _to_out(db: DbSession, document, permission: str) -> DocumentOut:
         content=document.content,
         permission=permission,
         owner=UserOut.model_validate(owner),
+        is_template=document.is_template,
     )
 
 
@@ -48,12 +50,40 @@ async def list_documents(db: DbSession, user: CurrentUser) -> DocumentListOut:
             **DocumentSummary.model_validate(document).model_dump(),
             starred=document.id in starred,
             folder_id=document.folder_id,
+            is_template=document.is_template,
         )
 
     return DocumentListOut(
         owned=[item(d) for d in owned],
         shared=[item(d) for d in shared],
     )
+
+
+@router.post(
+    "/{document_id}/duplicate",
+    response_model=DocumentOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def duplicate_document(
+    document_id: UUID,
+    db: DbSession,
+    user: CurrentUser,
+    as_copy: bool = True,
+) -> DocumentOut:
+    """Copy a document into the caller's account.
+
+    A POST to the original rather than a create-with-a-source, because the thing
+    being described is an act on an existing document.
+
+    Anyone who can see it may copy it: they can already export it as Markdown
+    and import the file back, which produces a worse copy through more steps.
+
+    `as_copy=false` drops the "Copy of" prefix, which is how a template becomes
+    a document under its own name.
+    """
+    copy = await duplication.duplicate(db, document_id, user.id, as_copy=as_copy)
+
+    return await _to_out(db, copy, "owner")
 
 
 @router.post("", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)

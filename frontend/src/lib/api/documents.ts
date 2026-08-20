@@ -28,6 +28,9 @@ export interface DocumentPatch {
    *  alone — the backend distinguishes the two, and sending null on every save
    *  would take documents out of their folders as they were typed in. */
   folder_id?: string | null;
+  /** Owner only. Omit to leave it alone: `false` unmarks a template, so it
+   *  cannot double as "not sent". */
+  is_template?: boolean;
 }
 
 /** Save a document.
@@ -401,4 +404,20 @@ export function markNotificationsRead(ids?: string[]): Promise<{ count: number }
     method: "POST",
     body: JSON.stringify(ids === undefined ? {} : { ids }),
   });
+}
+
+/** Copy a document into your own account.
+ *
+ * Anyone who can see it may copy it — they can already export it as Markdown
+ * and import the file back, which produces a worse copy through more steps.
+ * The copy carries the title, content and attachments, and leaves behind the
+ * shares, comments, history, stars and template flag.
+ *
+ * `asCopy: false` drops the "Copy of" prefix, which is how a template becomes a
+ * document under its own name. */
+export function duplicateDocument(id: string, asCopy = true): Promise<DocumentDetail> {
+  return apiFetch<DocumentDetail>(
+    `/api/v1/documents/${id}/duplicate?as_copy=${asCopy}`,
+    { method: "POST" },
+  );
 }

@@ -113,6 +113,41 @@ async def signed_url(path: str, expires_in: int = DOWNLOAD_URL_TTL_SECONDS) -> s
     return f"{base}{signed}" if signed.startswith("/") else f"{base}/{signed}"
 
 
+async def copy(source: str, destination: str) -> None:
+    """Copy an object within the attachments bucket.
+
+    Storage copies it server-side, so the bytes never travel through here. The
+    alternative — download then upload — would move every megabyte of every
+    duplicated document through the backend twice, for a result Storage can
+    produce without any of it leaving the region.
+    """
+    base, key = _require_configuration()
+
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.post(
+                f"{base}/object/copy",
+                json={
+                    "bucketId": BUCKET,
+                    "sourceKey": source,
+                    "destinationKey": destination,
+                },
+                headers=_headers(key),
+            )
+    except httpx.HTTPError as exc:
+        logger.error("Storage copy failed for %s: %s", source, exc)
+        raise StorageUnavailableError("Could not copy the file") from exc
+
+    if response.status_code >= 400:
+        logger.error(
+            "Storage copy of %s returned %s: %s",
+            source,
+            response.status_code,
+            response.text[:200],
+        )
+        raise StorageUnavailableError("Could not copy the file")
+
+
 async def remove(paths: list[str]) -> None:
     """Delete objects, tolerating ones that are already gone.
 

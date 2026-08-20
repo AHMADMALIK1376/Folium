@@ -105,6 +105,7 @@ function makeDocument(
     // Off by default here, so these tests describe the editor rather than the
     // attachments panel. One test below turns it on.
     attachments_enabled: attachmentsEnabled,
+    is_template: false,
     owner: {
       id: "u1",
       email: "owner@example.com",

@@ -133,14 +133,21 @@ cd frontend && npm install && npm run dev
 Open http://localhost:3000. There are no seeded accounts and no click-to-continue login: sign up
 with an email and a password, and you land on your dashboard.
 
-The frontend also builds and runs in production mode from `frontend/`:
+**`npm run dev` is slow on the first visit to each page, and that is the dev server, not the app.**
+Next compiles a route the first time it is requested, and the editor route is the heaviest in the
+app — TipTap, ProseMirror, Yjs and every extension. Measured on this machine, cold:
+
+| | `npm run dev` | production build |
+|---|---|---|
+| Sign up | 19.6s | 9.0s |
+| **Open a document — first visit** | **13.3s** | **2.9s** |
+| Open the same document again | 2.0s | 1.9s |
+
+The second visit is fast in both, because by then the route is compiled. If the app feels like it
+takes twenty seconds to open a document, build it and run it:
 
 ```bash
-cd frontend && npm run build
-```
-
-```bash
-cd frontend && npm run start
+cd frontend && npm run build && npm run start
 ```
 
 Frontend tests:
@@ -487,6 +494,56 @@ words alone except as the first or last word, so "the rise and fall of the roman
 
 **Keyboard shortcuts** are listed under **Shortcuts** in the header — an editor with thirty
 shortcuts and no list of them has thirty secrets.
+
+## Performance, and where the time actually goes
+
+Two different problems get called "the app is slow", and they have nothing to do with each other.
+
+**The dev server.** See [Running it locally](#running-it-locally) — `next dev` compiles each route on
+its first request, and the editor route takes about 13 seconds to compile. A production build has no
+compile step, and the same navigation takes 2.9s.
+
+**The database is in another region.** Every authenticated request costs a round trip to a hosted
+Postgres, and that is the floor under everything. `backend/scripts/measure_endpoints.py` measures it
+against the real database rather than guessing:
+
+```bash
+cd backend && ./.venv/Scripts/python.exe scripts/measure_endpoints.py
+```
+
+It reports each endpoint cold and warm, interleaved — because the network drifts, so two separate
+runs are not comparable with each other.
+
+### What the app does about it
+
+**Resolved users are cached for a minute.** Every authenticated request has to answer "who is this",
+and that was a `SELECT` on the users table — measured at **~480ms**, which was the floor for
+`GET /me`, an endpoint that does nothing else. A document page makes six or seven authenticated
+calls, so the app paid around three seconds of pure identity before any of them did their own work.
+It is now **4ms** on a warm cache.
+
+That is only safe because of what the cache checks. Email, display name and avatar are the only
+mutable fields, and all three arrive **in the token** — so a cache hit compares them and falls
+through to the database the moment they differ. What the one-minute window really bounds is a user
+row deleted out from under a live session, which self-heals and is not something the app does.
+
+**The dashboard is one request, not two.** Stars used to be fetched separately; the list carries the
+flag (Phase 11).
+
+**The mention list is fetched when you start writing a comment, not when the page loads.** Only the
+mention picker reads it, and the picker cannot open until the compose box has focus — so an eager
+fetch cost every reader of every document a request they would probably never make.
+
+**Nothing polls faster than it needs to.** The notification count is asked once on load and once a
+minute after that; see [Notifications](#notifications-and-mentions) for why polling rather than a
+second realtime system.
+
+### What is still slow, honestly
+
+Roughly 600ms per endpoint, and most of that is distance. A document page still makes several calls,
+each paying its own round trip to `ap-south-1`. The remaining levers are moving Postgres closer to
+the backend and folding more of what one page needs into fewer responses — not more code in front of
+the same queries.
 
 ## Repository layout
 

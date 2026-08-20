@@ -74,6 +74,10 @@ class DocumentUpdate(BaseModel):
     # "leave the folder alone". `model_fields_set` is how: without that check
     # every title-only autosave would silently unfile the document.
     folder_id: uuid.UUID | None = None
+    # Owner only, and `model_fields_set` again: False is meaningful — it stops
+    # something being a template — so its absence has to be distinguishable
+    # from it, exactly as for folder_id above.
+    is_template: bool | None = None
 
     @field_validator("title")
     @classmethod
@@ -105,6 +109,7 @@ class DocumentOut(DocumentSummary):
     content: dict[str, Any]
     permission: str
     owner: UserOut
+    is_template: bool = False
 
     @computed_field
     @property
@@ -133,6 +138,7 @@ class DocumentListItem(DocumentSummary):
 
     starred: bool = False
     folder_id: uuid.UUID | None = None
+    is_template: bool = False
 
 
 class DocumentListOut(BaseModel):

@@ -29,6 +29,12 @@ class Document(Base):
         nullable=True,
         index=True,
     )
+    # A template is a document with a flag on it, not a separate kind of thing.
+    # It is written in the same editor, kept in the same list and exported the
+    # same way; the flag only says "offer this when starting something new".
+    is_template: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

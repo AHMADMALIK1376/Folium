@@ -167,3 +167,28 @@ test("the share dialog fits a phone", async ({ page }) => {
   await page.screenshot({ path: "test-results/mobile/share-dialog.png" });
   await expectNoSidewaysScroll(page, "the share dialog");
 });
+
+test("the find bar fits a phone", async ({ page }) => {
+  // New surface in Phase 16, and the densest row in the app: two text fields,
+  // a count, three toggles and two buttons.
+  test.slow();
+
+  await signUp(page, uniqueEmail("mob-find"));
+  await page.getByRole("button", { name: /new document/i }).click();
+  await page.getByRole("link", { name: /untitled document/i }).click();
+  await expect(page).toHaveURL(/\/documents\//);
+
+  const body = page.getByRole("textbox", { name: /document body/i });
+  await body.click();
+  await body.pressSequentially("The cat sat on the mat.");
+  await expect(page.getByRole("status", { name: /save status/i })).toHaveText(/^saved$/i);
+
+  await page.getByRole("button", { name: /^find$/i }).click();
+  const bar = page.getByRole("search", { name: /find in document/i });
+  await bar.getByRole("textbox", { name: "Find" }).fill("cat");
+  await bar.getByRole("button", { name: /replace…/i }).click();
+  await expect(bar.getByLabel(/replace with/i)).toBeVisible();
+
+  await page.screenshot({ path: "test-results/mobile/find-bar.png", fullPage: true });
+  await expectNoSidewaysScroll(page, "the find bar");
+});

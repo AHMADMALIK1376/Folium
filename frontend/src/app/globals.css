@@ -306,6 +306,21 @@
   position: relative;
 }
 
+/* A find match, and the one you are on.
+   A decoration again, so searching a document leaves no trace in it. The
+   current match is a different colour rather than merely brighter: "3 of 17" is
+   only useful if you can see which one is 3, and a difference in saturation
+   alone is not a difference for a good number of readers. */
+.folium-find {
+  background: rgba(59, 130, 246, 0.25);
+  border-radius: 2px;
+}
+
+.folium-find-current {
+  background: rgba(249, 115, 22, 0.5);
+  outline: 1px solid rgba(194, 65, 12, 0.6);
+}
+
 /* A passage someone commented on.
    Painted by a ProseMirror decoration rather than a mark, so it is an overlay
    on the view and no part of the document: it cannot reach an export, cannot
@@ -348,6 +363,15 @@
 
   /* Collaboration carets are absolutely positioned overlays. On screen they
      are other people; on paper they are stray marks in the margin. */
+  /* Neither a find match nor a comment highlight is part of the document. On
+     paper there is no bar to close and no panel to click through to, so both
+     would be stray colour with no explanation. */
+  .folium-find,
+  .folium-find-current {
+    background: transparent !important;
+    outline: none !important;
+  }
+
   /* A comment highlight is an annotation about the document, not part of it.
      On paper there is no panel to click through to, so it would be a stray
      yellow band with no explanation. */

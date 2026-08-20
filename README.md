@@ -46,6 +46,7 @@ share them with other people.
 | [13](docs/superpowers/specs/2026-08-17-phase-13-folders-design.md) | Folders: organisation, not access | Done |
 | [14](docs/superpowers/specs/2026-08-20-phase-14-comments-design.md) | Comments, anchored to a passage — and the `comment` permission finally means something | Done |
 | [15](docs/superpowers/specs/2026-08-20-phase-15-notifications-design.md) | Notifications and mentions | Done |
+| [16](docs/superpowers/specs/2026-08-20-phase-16-writing-tools-design.md) | Find and replace, document outline, word count, change case | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -70,6 +71,11 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - Create, rename, and edit rich-text documents — bold, italic, underline, strikethrough, inline code,
   links, headings, quotes, code blocks, rules, checklists, tables, and bulleted/numbered lists — with
   autosave. Type `/` on an empty line to insert any of them without reaching for the toolbar.
+- **Find and replace** inside a document (Ctrl+F, Ctrl+H), with a match count, match-case, and
+  Replace All as a single undo step.
+- **Jump by heading** with the document outline, and see **word count, character count and reading
+  time** — for the whole document, or for whatever is selected.
+- **Change the case** of a selection: upper, lower, or Title Case that leaves the small words alone.
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
@@ -443,6 +449,45 @@ second thing to operate, deploy and debug for a feature whose whole requirement 
 is fine". The count also refreshes immediately after anything that could change it, so the common
 case never waits for a tick.
 
+## Writing tools
+
+The editor's formatting has been Word-like since Phase 9. These are the things Word gives you for
+working on a document rather than a paragraph.
+
+**Find and replace.** `Ctrl+F` to find, `Ctrl+H` to find and replace, `Enter` and `Shift+Enter` to
+step through matches, `Escape` to close — or the **Find** button in the header, which is there
+because nobody discovers an intercepted shortcut.
+
+Ctrl+F is taken over deliberately, and that is a debt the feature has to repay: the browser's own
+find searches only what is laid out, cannot replace, and cannot tell the editor where it landed.
+Having taken the shortcut, what replaces it has to be better.
+
+| Decision | Why |
+|---|---|
+| Literal matching, not regex | A find bar that accepts regex turns a stray `(` into an error the user did not ask to debug |
+| Case-insensitive by default | What people mean by "find the" is almost never "find exactly lowercase the" |
+| The current match is a different colour | "3 of 17" is only useful if you can see which one is 3 |
+| Replace All is one undo step | Otherwise undoing a 200-match replace is 200 keystrokes |
+| `0 results` rather than silence | After typing, nothing on screen is indistinguishable from a control that has stopped working |
+
+Matches are **ProseMirror decorations** — a view-layer overlay — so searching a document cannot
+change it. Only Replace writes, and only for someone who may edit: a viewer and a commenter get
+find, which is the useful half.
+
+**The outline** lists every heading and jumps to one, and hides itself entirely when the document
+has none rather than promising a structure it has not got.
+
+**Statistics** — words, characters and reading time — sit below the editor, and follow the selection
+when there is one. Reading time uses 238 words per minute, from Brysbaert's 2019 meta-analysis of
+silent reading rates; the number matters less than not inventing one.
+
+**Change case** cycles a selection through upper, lower and Title Case. Title Case leaves the small
+words alone except as the first or last word, so "the rise and fall of the roman empire" becomes
+"The Rise and Fall of the Roman Empire" rather than the naive version with a capital And.
+
+**Keyboard shortcuts** are listed under **Shortcuts** in the header — an editor with thirty
+shortcuts and no list of them has thirty secrets.
+
 ## Repository layout
 
 ```
@@ -528,6 +573,14 @@ DEPLOY.md               deployment guide
   dropping the mention.
 - **No per-kind preferences, digests or muting**, and nothing is sent for edits, resolutions or
   deletions — each is either routine or already known to whoever did it.
+- **Find is literal and within one document.** No regex, and no find-across-documents — that is
+  search, and it lives on the dashboard.
+- **No footnotes, bookmarks or cross-references.** Each needs a way to name a position in a document
+  durably, which is exactly the problem comments had to solve with quote anchors because there is no
+  such thing here.
+- **No page layout, margins, headers, footers or page numbers.** Folium documents are not paginated
+  — PDF export is the browser printing a continuous page, and pretending otherwise would be a lie
+  the export would then have to keep.
 - **A comment cannot be reattached by hand** once its passage is gone.
 
 ## Development

@@ -23,6 +23,7 @@ import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
 import { SlashMenu } from "@/components/editor/SlashMenu";
+import { TemplateToggle } from "@/components/editor/TemplateToggle";
 import { TableControls } from "@/components/editor/TableControls";
 import { updateDocument, type DocumentPatch } from "@/lib/api/documents";
 import type { DocumentDetail, TipTapDoc } from "@/lib/api/types";
@@ -307,8 +308,16 @@ function DocumentEditorSurface({
 
         {/* Owners only, not editors: the backend answers 404 to share mutations
             from anyone but the owner, so an editor given this could only ever
-            collect errors. */}
-        {document.permission === "owner" && <ShareDialog documentId={document.id} />}
+            collect errors. The same is true of the template flag. */}
+        {document.permission === "owner" && (
+          <>
+            <TemplateToggle
+              documentId={document.id}
+              isTemplate={document.is_template}
+            />
+            <ShareDialog documentId={document.id} />
+          </>
+        )}
       </div>
 
       {!editable && (

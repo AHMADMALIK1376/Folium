@@ -5,8 +5,10 @@ import { CreateDocumentButton } from "@/components/documents/CreateDocumentButto
 import { DeleteDocumentDialog } from "@/components/documents/DeleteDocumentDialog";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { DocumentSearch } from "@/components/documents/DocumentSearch";
+import { DuplicateButton } from "@/components/documents/DuplicateButton";
 import { ImportDocumentButton } from "@/components/documents/ImportDocumentButton";
 import { StarButton } from "@/components/documents/StarButton";
+import { TemplatePicker } from "@/components/documents/TemplatePicker";
 import { UNFILED } from "@/components/folders/FolderNav";
 import { FolderSelect } from "@/components/folders/FolderSelect";
 import { getDocuments, getFolders } from "@/lib/api/server";
@@ -65,8 +67,11 @@ export default async function DashboardPage({
             </Link>
           )}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <ImportDocumentButton />
+          {/* Templates the reader owns. Built-in ones are content in the app
+              and need no fetching. */}
+          <TemplatePicker templates={data.owned.filter((d) => d.is_template)} />
           <CreateDocumentButton />
         </div>
       </div>
@@ -108,6 +113,7 @@ export default async function DashboardPage({
                   folderId={document.folder_id}
                   folders={folders}
                 />
+                <DuplicateButton documentId={document.id} title={document.title} />
                 <StarButton documentId={document.id} starred={document.starred} />
                 <DeleteDocumentDialog document={document} />
               </span>
@@ -133,8 +139,14 @@ export default async function DashboardPage({
               // Starrable but not deletable: a star is a private bookmark,
               // which is why a collaborator may keep one on a document they
               // cannot delete.
+              // Duplicable as well as starrable: anyone who can read a
+              // document can already export and re-import it, so the button
+              // grants nothing new — it removes a detour.
               renderAction={(document) => (
-                <StarButton documentId={document.id} starred={document.starred} />
+                <span className="flex items-center gap-1">
+                  <DuplicateButton documentId={document.id} title={document.title} />
+                  <StarButton documentId={document.id} starred={document.starred} />
+                </span>
               )}
             />
           )}

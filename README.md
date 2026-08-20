@@ -47,6 +47,8 @@ share them with other people.
 | [14](docs/superpowers/specs/2026-08-20-phase-14-comments-design.md) | Comments, anchored to a passage — and the `comment` permission finally means something | Done |
 | [15](docs/superpowers/specs/2026-08-20-phase-15-notifications-design.md) | Notifications and mentions | Done |
 | [16](docs/superpowers/specs/2026-08-20-phase-16-writing-tools-design.md) | Find and replace, document outline, word count, change case | Done |
+| 17 | Performance: a resolved user is cached, not re-fetched on every request | Done |
+| [18](docs/superpowers/specs/2026-08-20-phase-18-templates-design.md) | Duplicate a document; templates | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -76,6 +78,10 @@ v1 was a single Next.js app with mocked auth and a local SQLite file. None of it
 - **Jump by heading** with the document outline, and see **word count, character count and reading
   time** — for the whole document, or for whatever is selected.
 - **Change the case** of a selection: upper, lower, or Title Case that leaves the small words alone.
+- **Duplicate any document you can see** — including one shared with you. The copy is yours,
+  carries the content and the attachments, and leaves the shares, comments, history and stars behind.
+- **Start from a template**: three built in (meeting notes, weekly update, project brief), plus any
+  document of your own you mark as one.
 - Import a `.txt` or `.md` file as a new document.
 - Export a document as Markdown, or print it as a PDF — including documents shared with you.
 - Attach files to a document — images, PDFs, and text — and download them again, when a storage
@@ -545,6 +551,43 @@ each paying its own round trip to `ap-south-1`. The remaining levers are moving 
 the backend and folding more of what one page needs into fewer responses — not more code in front of
 the same queries.
 
+## Duplication and templates
+
+**Duplicate any document you can see**, including one shared with you. That is not a loosening of
+anything: anyone who can read a document can already export it as Markdown and import the file back,
+which produces a worse copy through more steps. The button removes the detour.
+
+The copy is yours and fresh:
+
+| Carried over | Left behind | Why |
+|---|---|---|
+| Title, prefixed "Copy of" | Shares | A copy is not a re-share; who sees it is the copier's decision |
+| Content | Comments | A discussion is about the document it happened on |
+| Attachments | Version history | The copy has no past |
+| | Stars | A private bookmark, not a property of the document |
+| | The template flag | A copy of a template is a document, which is the point of using one |
+
+**Attachments are copied and the content is rewritten to point at the copies.** This is the part it
+would be tempting to skip, and skipping it produces a document whose images work today and break the
+moment the original is deleted or unshared — a duplicate that quietly rots, which is worse than no
+duplicate. Storage copies the objects server-side, so the bytes never travel through the backend. A
+file that cannot be copied is skipped rather than failing the whole duplication, and its reference is
+left pointing where it already worked.
+
+**A template is a document with a flag on it**, not a separate kind of thing. It is written in the
+same editor, kept in the same list and exported the same way; the flag only says "offer this when
+starting something new". Mark one with **Save as template** in its editor — owner only, because an
+editor may change what a document says but whether it is offered as a starting point is the owner's
+call.
+
+**New from template** on the dashboard offers your own alongside three built-in ones — meeting
+notes, weekly update, project brief. The built-ins live in the app as content rather than as rows:
+they are identical for everyone and never change without a deploy, so a row per user per template
+would be a migration and a seeding job to say what a constant already says.
+
+Using a template creates the document under the template's own name, not "Copy of" — and the new
+document is not itself a template, which is the entire point.
+
 ## Repository layout
 
 ```
@@ -635,6 +678,9 @@ DEPLOY.md               deployment guide
 - **No footnotes, bookmarks or cross-references.** Each needs a way to name a position in a document
   durably, which is exactly the problem comments had to solve with quote anchors because there is no
   such thing here.
+- **Templates have no variables or placeholders.** Something that gets filled in on use is a form
+  wearing a template's clothes, and a different feature.
+- **A folder cannot be duplicated**, and a duplicate carries no comments.
 - **No page layout, margins, headers, footers or page numbers.** Folium documents are not paginated
   — PDF export is the browser printing a continuous page, and pretending otherwise would be a lie
   the export would then have to keep.

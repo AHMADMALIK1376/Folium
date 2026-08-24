@@ -88,7 +88,31 @@ async def verify_token(token: str, cache=None) -> TokenClaims:
             audience=settings.jwt_audience,
             issuer=settings.jwt_issuer,
             leeway=60,
-            options={"require": ["exp", "iss", "aud", "sub"]},
+            options={
+                "require": ["exp", "iss", "aud", "sub"],
+                # `iat` is NOT verified, and that is deliberate.
+                #
+                # PyJWT rejects a token whose issued-at is in the future, which
+                # sounds prudent and is really a clock check wearing a security
+                # check's clothes. It cost a whole afternoon: a machine three
+                # hours behind Supabase refused every token that project issued
+                # — every request, every user, one opaque 401, and nothing on
+                # screen suggesting the clock.
+                #
+                # There is nothing to lose by dropping it. `iat` is
+                # informational in RFC 7519; what bounds a token's life is
+                # `exp`, which is still required and still verified, and what
+                # proves it genuine is the signature. No policy here asks how
+                # old a token is. So verifying `iat` can only ever produce a
+                # false negative, and it produces a catastrophic one.
+                #
+                # A skewed clock is still worth fixing — `exp` is checked
+                # against the same wrong `now`, so a machine behind by an hour
+                # accepts tokens for an hour after they expire. That is the
+                # clock's problem to fix, not a reason to also refuse valid
+                # tokens.
+                "verify_iat": False,
+            },
         )
     except jwt.PyJWTError as exc:
         logger.info("Rejected token: %s", exc)

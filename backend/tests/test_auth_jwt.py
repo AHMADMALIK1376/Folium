@@ -1,3 +1,4 @@
+import time
 import uuid
 
 import pytest
@@ -125,6 +126,42 @@ async def test_malformed_authorization_header_is_401(client: AsyncClient, header
 
 async def test_expired_token_is_401(client: AsyncClient):
     token = make_token(issuer=ISSUER, expires_in=-60)
+    assert (await client.get("/api/v1/me", headers=bearer(token))).status_code == 401
+
+
+async def test_a_token_issued_in_our_future_is_still_accepted(client: AsyncClient):
+    """A clock behind the issuer must not lock everybody out.
+
+    This is not hypothetical. A machine three hours behind Supabase refused
+    every token that project issued — every request, every user, one opaque 401
+    with nothing on screen suggesting the clock. `iat` is informational in RFC
+    7519; `exp` bounds a token's life and the signature proves it genuine, so
+    verifying `iat` could only ever produce a false negative, and produced a
+    catastrophic one.
+    """
+    # A unique email, like every other test that expects to provision a user:
+    # make_token defaults to user@example.com, and in a full run that address is
+    # already bound to a different account — which is a 409, not a 401, and a
+    # confusing way to fail a test about clocks.
+    token = make_token(
+        issuer=ISSUER,
+        email=f"skew-{uuid.uuid4()}@example.com",
+        iat=int(time.time()) + 3600,
+    )
+
+    assert (await client.get("/api/v1/me", headers=bearer(token))).status_code == 200
+
+
+async def test_a_token_that_has_expired_is_still_refused(client: AsyncClient):
+    """The other half of the same decision: dropping the `iat` check must not
+    quietly drop the `exp` check with it."""
+    token = make_token(
+        issuer=ISSUER,
+        email=f"skew-{uuid.uuid4()}@example.com",
+        expires_in=-3600,
+        iat=int(time.time()) + 3600,
+    )
+
     assert (await client.get("/api/v1/me", headers=bearer(token))).status_code == 401
 
 

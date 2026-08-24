@@ -588,6 +588,41 @@ would be a migration and a seeding job to say what a constant already says.
 Using a template creates the document under the template's own name, not "Copy of" — and the new
 document is not itself a template, which is the entire point.
 
+## Troubleshooting
+
+### Everything returns 401 and the app says your session has expired
+
+**Check the machine's clock first.** If it is more than a minute out of step with
+Supabase, every token that project issues can look wrong to the machine
+verifying it, and the symptom gives no hint of the cause: the sign-in succeeds,
+Supabase is happy, the middleware lets you through, and then every single API
+call comes back 401 with one deliberately opaque message.
+
+```bash
+cd backend && ./.venv/Scripts/python.exe scripts/diagnose_auth.py
+```
+
+That signs up a throwaway account, gets a genuine token, and runs it through the
+real verifier with the reason printed — the API itself returns one identical
+body for every authentication failure on purpose, so it will never tell you.
+
+To fix the clock on Windows, from an **administrator** terminal:
+
+```bash
+w32tm /resync
+```
+
+The verifier no longer rejects a token for being issued in the future, so a
+skewed clock does not lock you out any more. It is still worth fixing: `exp` is
+checked against the same wrong clock, so a machine an hour behind will keep
+accepting tokens for an hour after they expire.
+
+### The first visit to a page takes 20 seconds
+
+That is `next dev` compiling the route. See
+[Running it locally](#running-it-locally) — a production build has no compile
+step.
+
 ## Repository layout
 
 ```

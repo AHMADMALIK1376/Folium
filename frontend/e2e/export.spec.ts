@@ -2,19 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-function uniqueEmail(role = "export") {
-  return `e2e-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-}
+import { signUp, uniqueEmail } from "./support/auth";
 
 test("a document downloads as Markdown, with its formatting", async ({ page }) => {
   test.slow();

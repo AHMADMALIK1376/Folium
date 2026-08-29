@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { signUp, uniqueEmail } from "./support/auth";
+
 /** The whole phase, in one test.
  *
  * Every unit test around collaboration can pass while the real thing is broken:
@@ -17,20 +19,6 @@ test.describe(() => {
     !CONFIGURED,
     "Set Y_SWEET_CONNECTION_STRING and run `y-sweet serve` to exercise collaboration",
   );
-
-  function uniqueEmail(role: string) {
-    return `e2e-collab-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-  }
-
-  const PASSWORD = "e2e-password-123";
-
-  async function signUp(page: Page, email: string) {
-    await page.goto("/signup");
-    await page.getByLabel(/email/i).fill(email);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole("button", { name: /create account/i }).click();
-    await expect(page).toHaveURL(/\/dashboard/);
-  }
 
   async function shareWith(page: Page, email: string, permission: "view" | "edit") {
     await page.getByRole("button", { name: /^share$/i }).click();
@@ -53,8 +41,8 @@ test.describe(() => {
     const owner = await ownerContext.newPage();
     const guest = await guestContext.newPage();
 
-    const guestEmail = uniqueEmail("guest");
-    await signUp(owner, uniqueEmail("owner"));
+    const guestEmail = uniqueEmail("collab-guest");
+    await signUp(owner, uniqueEmail("collab-owner"));
     await signUp(guest, guestEmail);
 
     await owner.getByRole("button", { name: /new document/i }).click();
@@ -126,8 +114,8 @@ test.describe(() => {
     const owner = await ownerContext.newPage();
     const guest = await guestContext.newPage();
 
-    const guestEmail = uniqueEmail("viewer");
-    await signUp(owner, uniqueEmail("owner"));
+    const guestEmail = uniqueEmail("collab-viewer");
+    await signUp(owner, uniqueEmail("collab-owner"));
     await signUp(guest, guestEmail);
 
     await owner.getByRole("button", { name: /new document/i }).click();

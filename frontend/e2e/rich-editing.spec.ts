@@ -2,21 +2,9 @@ import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { signUp, uniqueEmail } from "./support/auth";
+
 /** Links and checklists, through the browser and out the other side. */
-
-function uniqueEmail(role = "rich") {
-  return `e2e-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-}
 
 async function newDocument(page: Page) {
   await page.getByRole("button", { name: /new document/i }).click();

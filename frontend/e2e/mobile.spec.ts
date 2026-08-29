@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { signUp, uniqueEmail } from "./support/auth";
+
 /** The app on a phone.
  *
  * Phase 11 made the shell and the toolbars responsive and said plainly that
@@ -12,20 +14,6 @@ import { expect, test, type Page } from "@playwright/test";
  * test-results/mobile/. */
 
 test.use({ viewport: { width: 375, height: 812 } });
-
-function uniqueEmail(role: string) {
-  return `e2e-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-}
 
 /** Nothing may stick out sideways.
  *

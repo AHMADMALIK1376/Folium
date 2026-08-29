@@ -1,18 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-function uniqueEmail() {
-  return `e2e-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-}
+import { signUp, uniqueEmail } from "./support/auth";
 
 const MARKDOWN = `# Quarterly notes
 

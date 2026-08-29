@@ -1,16 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-/** A fresh address per run.
- *
- * The backend suite learned this the hard way: fixed addresses pass once
- * against a clean database and then collide forever. `@example.com` is also
- * what backend/scripts/clean_test_data.py matches, so these accounts are
- * removable afterwards. */
-function uniqueEmail() {
-  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
+import { PASSWORD, SIGN_UP_TIMEOUT_MS, signUp, uniqueEmail } from "./support/auth";
 
 test("signed-out visitors cannot reach the account page", async ({ page }) => {
   await page.goto("/account");
@@ -41,7 +31,7 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   // This project runs with email confirmation off, so Supabase returns a live
   // session and the new account is signed in immediately. Telling them to
   // check an inbox no mail was sent to would strand them on /signup.
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: SIGN_UP_TIMEOUT_MS });
 
   // The profile now lives one click away rather than being the landing page,
   // so this also proves the header keeps it reachable.
@@ -58,7 +48,7 @@ test("sign up, sign in, see the profile from the API, sign out", async ({ page }
   await page.getByLabel(/password/i).fill(PASSWORD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: SIGN_UP_TIMEOUT_MS });
 
   await page.goto("/account");
   // This is the milestone: the address came back from FastAPI, which verified
@@ -87,7 +77,7 @@ test("credentials never reach a URL", async ({ page }) => {
   await page.getByLabel(/email/i).fill(uniqueEmail());
   await page.getByLabel(/password/i).fill(PASSWORD);
   await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  await expect(page).toHaveURL(/\/dashboard/, { timeout: SIGN_UP_TIMEOUT_MS });
 
   for (const url of [...seen, page.url()]) {
     expect(url).not.toContain("password");

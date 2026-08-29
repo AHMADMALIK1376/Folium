@@ -1,20 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-/** A fresh account per run, so the suite stays idempotent and
- *  backend/scripts/clean_test_data.py can remove what it creates. */
-function uniqueEmail() {
-  return `e2e-editor-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
-
-async function signUp(page: import("@playwright/test").Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
-}
+import { signUp, uniqueEmail } from "./support/auth";
 
 /** Create a document from the dashboard and open it. */
 async function openNewDocument(page: import("@playwright/test").Page) {

@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { signUp, uniqueEmail } from "./support/auth";
+
 /** Attaching files, against a real Supabase Storage bucket.
  *
  * Skipped when the backend has no service-role key — but the flag is the
@@ -15,25 +17,12 @@ import { expect, test, type Page } from "@playwright/test";
  * backend put on the document.
  */
 
-function uniqueEmail(role = "attach") {
-  return `e2e-${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-const PASSWORD = "e2e-password-123";
 const FILE_TEXT = "Attachment contents that must survive the round trip.\n";
 
 function textFile(name = "notes.txt"): string {
   const path = join(mkdtempSync(join(tmpdir(), "folium-e2e-")), name);
   writeFileSync(path, FILE_TEXT, "utf-8");
   return path;
-}
-
-async function signUp(page: Page, email: string) {
-  await page.goto("/signup");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(PASSWORD);
-  await page.getByRole("button", { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
 }
 
 async function newDocument(page: Page) {

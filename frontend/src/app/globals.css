@@ -238,6 +238,34 @@
   padding: 0 0.1em;
 }
 
+/* A named passage. Marked faintly rather than styled: a bookmark says what a
+   passage is called, and must not change how it reads. The dotted underline is
+   the smallest thing that answers "did that work" without becoming part of the
+   document's design. */
+.folium-prose .folium-bookmark {
+  border-bottom: 1px dotted var(--color-neutral-400);
+  text-decoration: none;
+  color: inherit;
+}
+
+/* On paper it is an anchor nobody can click, so it goes -- the same reasoning
+   that strips find matches and comment highlights from a printed page. */
+@media print {
+  .folium-prose .folium-bookmark {
+    border-bottom: none;
+  }
+}
+
+/* The contents list is document content, so unlike the Outline panel it prints.
+   Its buttons are links in everything but markup, and should read as text. */
+.folium-toc button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .folium-prose sub,
 .folium-prose sup {
   font-size: 0.75em;

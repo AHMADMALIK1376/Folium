@@ -28,14 +28,25 @@ function bell(page: Page) {
 
 /** Assert what the bell says, with the patience the design actually promises.
  *
- * Notifications are delivered by polling, and the stated contract is "within a
- * minute is fine". The count is refreshed on mount so this is normally
- * instant — but the bell cannot ask until the Supabase client has a session,
- * and on a cold load under a long suite that takes a moment. Asserting in the
- * suite's default 15s is stricter than the product, so this waits longer.
- * Still well inside the minute, so a genuinely broken bell still fails. */
+ * Notifications are delivered by polling on a **60 second** interval
+ * (`POLL_MS` in NotificationBell.tsx). The count is refreshed on mount too, so
+ * most of the time this resolves immediately — but when the notification is
+ * created by the *other* browser context, the watching page has no local event
+ * to refresh from and has to wait for the next poll.
+ *
+ * This used to wait 30 seconds, and the comment justifying it said the wait was
+ * "still well inside the minute, so a genuinely broken bell still fails". That
+ * was the bug. Being inside the minute is precisely what made it fail: the poll
+ * interval *is* a minute, so an assertion that gives up at 30 seconds loses a
+ * race it can only sometimes win. It lost a different one of these tests on
+ * roughly every other run, which is why it read as flakiness rather than as one
+ * cause — the same shape as the sign-up timeout in e2e/support/auth.ts.
+ *
+ * 75s is the poll interval plus room for the request and the render. Longer
+ * than the product's own promise, so a bell that is genuinely broken still
+ * fails; `test.slow()` gives each of these 180s, so it fits. */
 function expectBell(page: Page, pattern: RegExp) {
-  return expect(bell(page)).toHaveAccessibleName(pattern, { timeout: 30_000 });
+  return expect(bell(page)).toHaveAccessibleName(pattern, { timeout: 75_000 });
 }
 
 test("being shared a document, and being commented at, both ring the bell", async ({

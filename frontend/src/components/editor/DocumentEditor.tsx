@@ -19,6 +19,7 @@ import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
 import { FormattingControls } from "@/components/editor/FormattingControls";
+import { InsertControls } from "@/components/editor/InsertControls";
 import { PageSetupControl } from "@/components/editor/PageSetupControl";
 import {
   pageSetupCss,
@@ -393,6 +394,7 @@ function DocumentEditorSurface({
 
       {editor && editable && <EditorToolbar editor={editor} documentId={document.id} />}
       {editor && editable && <FormattingControls editor={editor} />}
+      {editor && editable && <InsertControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
       {editor && editable && (
         <div

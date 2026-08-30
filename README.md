@@ -51,6 +51,7 @@ share them with other people.
 | [18](docs/superpowers/specs/2026-08-20-phase-18-templates-design.md) | Duplicate a document; templates | Done |
 | [19](docs/superpowers/specs/2026-08-30-phase-19-rich-formatting-design.md) | A colour palette, font size, and justify | Done |
 | [20](docs/superpowers/specs/2026-08-30-phase-20-page-setup-design.md) | A real page: size, orientation and margins | Done |
+| [21](docs/superpowers/specs/2026-08-30-phase-21-insert-design.md) | Insert: symbols, dates, bookmarks, cross-references, contents | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -463,6 +464,52 @@ collaboration server exists but is per-document and optional; a second realtime 
 second thing to operate, deploy and debug for a feature whose whole requirement is "within a minute
 is fine". The count also refreshes immediately after anything that could change it, so the common
 case never waits for a tick.
+
+## Insert
+
+The Insert row holds things that go *into* a document rather than change how it
+reads.
+
+**Symbols.** A searchable picker of the characters a keyboard does not have —
+punctuation, mathematics, currency, arrows, marks and Greek letters. Searchable
+by how you would type them rather than what they are called: `x` finds ×, `->`
+finds →, `!=` finds ≠. Pasting a character in finds it too, which is how you ask
+"what is this and can I have another one".
+
+**Date and time**, in several formats plus ISO 8601. Inserted as **text and then
+frozen** — Word's "update automatically" makes a date change under whoever opens
+the document next, which is useful on a letterhead and quietly wrong on a dated
+record. The menu says which behaviour it has.
+
+**Bookmarks and cross-references.** Name a passage, then link to it from
+anywhere in the document. The name is slugified so it can be both an `id` and a
+URL fragment, and the slug is shown as you type it rather than discovered later.
+A name that would slugify to nothing, or that is already used, is refused with a
+reason on screen.
+
+**A table of contents** that lists the document's headings and follows them.
+Rename a heading and the list changes; there is no "update field" step, because
+there is nothing stored to update.
+
+### Why these were cheap
+
+Every node or mark added to the editor has to be taught to the Markdown
+converters in both directions, with an exact round trip — see
+[editor-schema.json](editor-schema.json). So the first question for each of
+these was whether it needed to be in the schema at all, and three of the five
+did not:
+
+| | Schema cost |
+|---|---|
+| Symbol | None — a character is not a node |
+| Date and time | None — inserted as text |
+| Cross-reference | None — it is a link whose href is `#name` |
+| Bookmark | One mark |
+| Table of contents | One node |
+
+The contents list stores **nothing** — its entries are read out of the document
+each time it renders — which is both why it cannot fall out of step and why it
+round-trips as a bare `<!-- toc -->` marker, the same one `markdown-toc` uses.
 
 ## The page
 

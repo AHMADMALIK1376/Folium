@@ -787,12 +787,30 @@ Start the backend in a second terminal, then:
 cd frontend && npm run e2e
 ```
 
-Playwright starts the frontend dev server itself; the backend it does not, and every page behind the
+Playwright builds and starts the frontend itself — a production build, not `next dev`, so no route
+pays a first-request compile mid-test. The backend it does not start, and every page behind the
 guard calls it.
+
+Forgetting the backend does not produce an error that mentions the backend. Sign-up still works,
+because that is Supabase and the browser talks to it directly, and the dashboard shell still
+renders; only the document list fails. The failure arrives as a missing **New document** button.
+The page snapshot Playwright writes to `test-results/**/error-context.md` shows the real message,
+`Could not load your documents.`
+
+Run the suite through `npm run e2e` rather than `npx playwright test`: the script pins
+`PLAYWRIGHT_BROWSERS_PATH` to the browsers `npm run e2e:install` put in `.playwright-browsers/`.
+A machine with that variable already set globally — some tools set it to a shared cache — will
+otherwise fail with `Executable doesn't exist`.
 
 The timeouts are raised above Playwright's defaults on purpose: each protected page is server-rendered
 from a FastAPI call to a hosted database, and the App Router commits a URL only once the destination's
 payload has arrived, so a sign-in landing legitimately takes several seconds.
+
+One timeout is set *down* rather than up. Playwright gives actions no deadline by default, so
+`click()` on a selector that matches nothing does not fail — it waits until the whole test runs out,
+and then reports a test timeout, which reads as an application that has become slow rather than a
+selector that has gone stale. `actionTimeout` is 15s, matching the assertion timeout, so a stale
+selector says what it was waiting for while the reason is still obvious.
 
 Browsers download to `D:\AJAIA\Folium\.playwright-browsers`, not the system drive. The path is set
 inside the npm scripts, so it works in any shell without a machine-wide variable.

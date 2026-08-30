@@ -20,6 +20,20 @@ export default defineConfig({
   // longer than five seconds on a cold server.
   expect: { timeout: 15_000 },
   use: {
+    // Actions get a deadline of their own, and this one is load-bearing.
+    //
+    // Playwright's default is no timeout: an action on a locator that matches
+    // nothing does not fail, it waits, and it waits until the *test* timeout
+    // rather than the assertion timeout. The two tests in history.spec.ts each
+    // spent the full 180 seconds that way, on a selector that had gone stale,
+    // and then reported "test timeout" -- which reads as an application that
+    // has become slow. It was read that way for a while, and the suite's
+    // wall-clock grew by six minutes to say nothing at all.
+    //
+    // 15s matches the expect timeout: long enough for a real action against a
+    // server-rendered page, short enough that a selector matching nothing says
+    // so while the reason is still obvious.
+    actionTimeout: 15_000,
     // 3100, not 3000, so the suite never collides with a dev server — Folium's
     // or, as happened once, an entirely different project's.
     baseURL: "http://localhost:3100",

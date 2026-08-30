@@ -209,6 +209,11 @@
 /* Marks Markdown cannot express, which travel as HTML tags. Without these the
    editor shows them unstyled and the author cannot tell they applied. */
 .folium-prose mark {
+  /* The fallback, not the colour. A highlight chosen in the toolbar carries an
+     inline background-color, which beats this rule; this one paints a mark that
+     arrived without a colour -- from a Markdown import, or from a document
+     written before highlights had colours. Removing it would make those
+     invisible. */
   background: #fef08a;
   padding: 0 0.1em;
 }

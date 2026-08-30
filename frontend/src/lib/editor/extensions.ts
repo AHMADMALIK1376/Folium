@@ -16,6 +16,8 @@ import TaskList from "@tiptap/extension-task-list";
 import Underline from "@tiptap/extension-underline";
 import StarterKit from "@tiptap/starter-kit";
 
+import { FontSize } from "./fontSize";
+
 /** The protocols a link may use.
  *
  * Kept in step with ALLOWED_PROTOCOLS in backend/app/utils/import_file.py, and
@@ -68,7 +70,12 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     // reason: the editor offers them, and dropping them on export would lose
     // something the author deliberately applied. <mark>, <sub> and <sup> are
     // understood by every renderer that matters.
-    Highlight,
+    Highlight.configure({
+      // Colours, not one fixed yellow. The mark still exports as <mark>; the
+      // colour rides on it as a style attribute and is the part Markdown
+      // cannot carry, which lossy.ts reports before an export drops it.
+      multicolor: true,
+    }),
     Subscript,
     Superscript,
     Image.configure({
@@ -114,6 +121,9 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     TextStyle,
     Color,
     FontFamily,
+    // Another attribute on textStyle rather than a mark of its own -- see the
+    // note in fontSize.ts for why that distinction matters to the schema.
+    FontSize,
     TextAlign.configure({
       // Headings and paragraphs only. Alignment on a list item or a table cell
       // is a different question with its own answers, and this is wide enough.

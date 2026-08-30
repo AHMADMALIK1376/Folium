@@ -44,6 +44,27 @@ describe("lossyFormattingIn", () => {
     ).toEqual(["fonts"]);
   });
 
+  it("finds text size, and a coloured highlight", () => {
+    expect(
+      lossyFormattingIn(
+        paragraph({ textAlign: null }, [
+          { type: "textStyle", attrs: { fontSize: "18pt" } },
+        ]),
+      ),
+    ).toEqual(["text size"]);
+
+    // The mark survives as <mark>; only which colour it was is lost, so a
+    // yellow and a pink highlight come back the same. Naming it is the whole
+    // point of the warning.
+    expect(
+      lossyFormattingIn(
+        paragraph({ textAlign: null }, [
+          { type: "highlight", attrs: { color: "#fef08a" } },
+        ]),
+      ),
+    ).toEqual(["highlight colour"]);
+  });
+
   it("does not report a textStyle mark carrying nothing", () => {
     // TipTap leaves an empty textStyle behind when a colour is unset. Warning
     // about formatting that is not there would train people to ignore it.

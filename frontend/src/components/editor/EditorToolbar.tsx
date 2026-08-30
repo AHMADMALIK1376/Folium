@@ -117,13 +117,6 @@ export function EditorToolbar({
         <span className="font-mono text-xs">&lt;&gt;</span>
       </ToolbarButton>
       <ToolbarButton
-        label="Highlight"
-        active={editor.isActive("highlight")}
-        onClick={() => editor.chain().focus().toggleHighlight().run()}
-      >
-        <span className="bg-amber-200 px-0.5">H</span>
-      </ToolbarButton>
-      <ToolbarButton
         label="Subscript"
         active={editor.isActive("subscript")}
         onClick={() => editor.chain().focus().toggleSubscript().run()}

@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.config import settings
+from app.schemas.page_setup import PageSetup
 from app.schemas.user import UserOut
 
 
@@ -78,6 +79,13 @@ class DocumentUpdate(BaseModel):
     # something being a template — so its absence has to be distinguishable
     # from it, exactly as for folder_id above.
     is_template: bool | None = None
+    # How the document sits on paper. Validated rather than accepted as loose
+    # JSON — see app/schemas/page_setup.py for why a jsonb column needs that.
+    #
+    # None is meaningful here too, and the fourth field to need `model_fields_set`:
+    # it means "back to the application's defaults", which is not the same as
+    # leaving the setting alone during a content autosave.
+    page_setup: PageSetup | None = None
 
     @field_validator("title")
     @classmethod
@@ -110,6 +118,9 @@ class DocumentOut(DocumentSummary):
     permission: str
     owner: UserOut
     is_template: bool = False
+    # None means "never set up": the editor applies its own defaults rather
+    # than the row asserting a page size nobody chose.
+    page_setup: PageSetup | None = None
 
     @computed_field
     @property

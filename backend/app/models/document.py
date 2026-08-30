@@ -35,6 +35,12 @@ class Document(Base):
     is_template: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # How the document sits on paper: size, orientation and the four margins.
+    # One jsonb column because nothing reads any of them without the others and
+    # nothing filters on them -- and because the set grows the moment headers
+    # and footers arrive. NULL means never set up, so the editor applies its own
+    # defaults rather than the row asserting a page size nobody chose.
+    page_setup: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

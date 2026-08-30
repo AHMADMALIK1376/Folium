@@ -10,6 +10,7 @@ import type {
   CommentThread,
   Folder,
   GrantablePermission,
+  PageSetupWire,
   SearchResults,
   Share,
   TipTapDoc,
@@ -31,6 +32,11 @@ export interface DocumentPatch {
   /** Owner only. Omit to leave it alone: `false` unmarks a template, so it
    *  cannot double as "not sent". */
   is_template?: boolean;
+  /** Anyone who may edit, unlike the two above — page size and margins are
+   *  formatting, not organisation. null returns the document to the
+   *  application's defaults, so omit the key to leave the page alone; sending
+   *  null on every save would reset the paper as it was typed on. */
+  page_setup?: PageSetupWire | null;
 }
 
 /** Save a document.

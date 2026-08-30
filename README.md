@@ -50,6 +50,7 @@ share them with other people.
 | 17 | Performance: a resolved user is cached, not re-fetched on every request | Done |
 | [18](docs/superpowers/specs/2026-08-20-phase-18-templates-design.md) | Duplicate a document; templates | Done |
 | [19](docs/superpowers/specs/2026-08-30-phase-19-rich-formatting-design.md) | A colour palette, font size, and justify | Done |
+| [20](docs/superpowers/specs/2026-08-30-phase-20-page-setup-design.md) | A real page: size, orientation and margins | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -462,6 +463,42 @@ collaboration server exists but is per-document and optional; a second realtime 
 second thing to operate, deploy and debug for a feature whose whole requirement is "within a minute
 is fine". The count also refreshes immediately after anything that could change it, so the common
 case never waits for a tick.
+
+## The page
+
+A document is drawn as a sheet of paper: its real width, its margins, a white
+sheet on a grey surround. **Page setup** in the editor offers A4, Letter and Legal,
+portrait or landscape, and Word's margin presets — Normal, Narrow, Moderate, Wide,
+Office 2003 Default — plus custom margins in inches.
+
+Inches rather than millimetres because the presets are stated in inches and this
+exists to match them: 0.75in is exact where 19.05mm is a rounding artefact of it.
+
+**What you see is what prints.** The same setting drives an `@page` rule, which is
+the only thing the browser's print dialog obeys — without it a PDF comes out on
+whatever paper the printer defaults to, whatever the document says.
+
+### What it does not do
+
+**Folium does not paginate, and this is a real limit rather than a missing
+afternoon's work.** Word knows where page 2 begins because it lays text into
+fixed-height boxes; a `contenteditable` is one continuous flow, and nothing in
+CSS can tell the editor where a page would end.
+
+So there are no visible page boundaries while editing, no repeating headers or
+footers, and no page numbers. **Mirrored margins are absent for the same
+reason**: inside/outside only means something once you know whether a page is odd
+or even. Offering it would draw something identical to Normal and claim to be
+doing more.
+
+The control says this on screen, where the setting is chosen, rather than leaving
+it to be found when a printed page does not match.
+
+Page setup is stored per document and **anyone who can edit may change it** —
+unlike filing and templates, which are the owner's. Those are organisation; page
+size and margins are formatting, the same kind of decision as alignment. A
+duplicate keeps the page setup, because a template whose margins do not survive
+being used is a template that does not work.
 
 ## Text formatting
 

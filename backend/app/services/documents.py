@@ -132,6 +132,19 @@ async def update_document(
             raise NotFoundError("Document not found")
         document.is_template = data.is_template
 
+    # Anyone who may edit, deliberately — unlike folder_id and is_template
+    # above. Those two are about organisation: where a document is filed and
+    # whether it is offered as a starting point, both the owner's call. Page
+    # size and margins are formatting, the same kind of decision as alignment
+    # or a heading level, and an editor already makes those.
+    #
+    # `model_fields_set` for the fourth time: None means "back to the
+    # application's defaults", which a content autosave must not do by omission.
+    if "page_setup" in data.model_fields_set:
+        document.page_setup = (
+            data.page_setup.model_dump() if data.page_setup is not None else None
+        )
+
     await db.commit()
     await db.refresh(document)
     return document, permission

@@ -172,6 +172,26 @@
   line-height: 1.7;
 }
 
+/* Inside a page, the sheet decides the measure.
+   .folium-prose caps itself at 78ch so a document on a wide monitor does not
+   run to 1500px lines. That is right for a document floating in the app shell
+   and wrong for one on a sheet of A4: the margins are already the measure, and
+   leaving the cap on would inset the text a second time and print narrower
+   than the page it claims. */
+.folium-page .folium-prose {
+  max-width: none;
+  margin-inline: 0;
+}
+
+/* The sheet. Width and padding are set per document by pageSetupCss(), which is
+   injected as a <style> tag -- they differ from one document to the next, and
+   @page cannot be parameterised any other way. Everything that does NOT vary
+   lives here. */
+.folium-page {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
 .folium-prose > * + * {
   margin-top: 0.75em;
 }

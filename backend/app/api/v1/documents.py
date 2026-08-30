@@ -31,6 +31,10 @@ async def _to_out(db: DbSession, document, permission: str) -> DocumentOut:
         permission=permission,
         owner=UserOut.model_validate(owner),
         is_template=document.is_template,
+        # Built field by field, so a new column returns its default until it is
+        # named here. Two tests caught that for is_template; this line exists
+        # because the ledger says so.
+        page_setup=document.page_setup,
     )
 
 

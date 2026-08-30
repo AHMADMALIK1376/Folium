@@ -25,8 +25,15 @@ export function lossyFormattingIn(doc: unknown): string[] {
     if (record.attrs?.textAlign) found.add("alignment");
 
     for (const mark of record.marks ?? []) {
+      // A highlight itself travels fine -- it exports as <mark>. Its colour
+      // does not, so a yellow and a pink highlight come back identical. That
+      // is a real loss and has to be named, or the warning is a lie by
+      // omission.
+      if (mark?.type === "highlight" && mark.attrs?.color) found.add("highlight colour");
+
       if (mark?.type !== "textStyle") continue;
       if (mark.attrs?.color) found.add("colour");
+      if (mark.attrs?.fontSize) found.add("text size");
       if (mark.attrs?.fontFamily) found.add("fonts");
     }
 
@@ -37,7 +44,9 @@ export function lossyFormattingIn(doc: unknown): string[] {
 
   // A stable order, so the sentence reads the same way every time rather than
   // reshuffling with whatever the document happened to contain first.
-  return ["colour", "fonts", "alignment"].filter((name) => found.has(name));
+  return ["colour", "highlight colour", "text size", "fonts", "alignment"].filter((name) =>
+    found.has(name),
+  );
 }
 
 /** The warning sentence, or null when there is nothing to warn about. */

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,6 +52,19 @@ describe("HistoryDialog", () => {
     listVersions.mockResolvedValue([version()]);
     getVersion.mockResolvedValue({ ...version(), content: doc("An earlier draft") });
     diffVersion.mockResolvedValue({ added: 0, removed: 0, segments: [] });
+  });
+
+  it("names the version list, so it can be addressed without knowing an author", async () => {
+    // The end-to-end test reaches a version through this label. It used to
+    // reach it through the author's name, which is a generated email local
+    // part -- and when the address format changed, the selector matched
+    // nothing and two tests spent three minutes each timing out instead of
+    // failing. A label is a contract, so it is worth one assertion here where
+    // breaking it costs two seconds to find rather than six minutes.
+    await open();
+
+    const list = await screen.findByRole("list", { name: /earlier versions/i });
+    expect(within(list).getByRole("button", { name: /alice chen/i })).toBeInTheDocument();
   });
 
   it("lists versions with their author and age", async () => {

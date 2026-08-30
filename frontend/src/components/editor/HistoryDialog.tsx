@@ -151,7 +151,11 @@ export function HistoryDialog({
         )}
 
         <div className="grid gap-4 sm:grid-cols-[minmax(0,14rem)_1fr]">
-          <ul className="grid max-h-80 gap-1 overflow-y-auto">
+          {/* Labelled, so the list can be addressed as a list. A screen reader
+              otherwise meets an unnamed run of buttons inside the dialog, and a
+              test has nothing to hold onto but whatever a version author
+              happens to be called. */}
+          <ul aria-label="Earlier versions" className="grid max-h-80 gap-1 overflow-y-auto">
             {versions?.length === 0 && (
               <li className="rounded-lg border border-dashed border-neutral-200 p-4 text-sm text-neutral-500">
                 No earlier versions yet. They appear here as you edit.

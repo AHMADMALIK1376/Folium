@@ -374,6 +374,68 @@ def test_a_coloured_run_keeps_its_words():
     assert "textStyle" not in exported and "color" not in exported
 
 
+def test_a_sized_run_keeps_its_words():
+    """Font size rides on textStyle, so it drops with it -- but only it."""
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "large and italic",
+                        "marks": [
+                            {"type": "textStyle", "attrs": {"fontSize": "24pt"}},
+                            {"type": "italic"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    exported = doc_to_markdown(original)
+    [node] = markdown_to_doc(exported)["content"][0]["content"]
+
+    assert node["text"] == "large and italic"
+    assert {m["type"] for m in node.get("marks", [])} == {"italic"}
+    assert "24pt" not in exported and "font-size" not in exported
+
+
+def test_a_coloured_highlight_keeps_its_words_and_its_mark():
+    """The highlight survives; only which colour it was is lost.
+
+    Different from colour and size, and worth its own test for that reason: the
+    mark is not dropped here, so an assertion that merely checks the text
+    survived would pass while the <mark> quietly disappeared.
+    """
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "worth marking",
+                        "marks": [{"type": "highlight", "attrs": {"color": "#fef08a"}}],
+                    }
+                ],
+            }
+        ],
+    }
+
+    exported = doc_to_markdown(original)
+    [node] = markdown_to_doc(exported)["content"][0]["content"]
+
+    assert node["text"] == "worth marking"
+    assert "highlight" in {m["type"] for m in node.get("marks", [])}
+    assert "#fef08a" not in exported
+
+
 def test_an_aligned_paragraph_keeps_its_words():
     original = {
         "type": "doc",

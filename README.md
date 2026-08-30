@@ -49,6 +49,7 @@ share them with other people.
 | [16](docs/superpowers/specs/2026-08-20-phase-16-writing-tools-design.md) | Find and replace, document outline, word count, change case | Done |
 | 17 | Performance: a resolved user is cached, not re-fetched on every request | Done |
 | [18](docs/superpowers/specs/2026-08-20-phase-18-templates-design.md) | Duplicate a document; templates | Done |
+| [19](docs/superpowers/specs/2026-08-30-phase-19-rich-formatting-design.md) | A colour palette, font size, and justify | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -462,6 +463,38 @@ second thing to operate, deploy and debug for a feature whose whole requirement 
 is fine". The count also refreshes immediately after anything that could change it, so the common
 case never waits for a tick.
 
+## Text formatting
+
+The formatting row under the main toolbar holds the things Markdown cannot carry.
+
+**Colour is a palette, not a list of colour names.** Twelve swatches for text and twelve for
+highlight, each opened from its own toolbar button. The palette is fixed rather than a full picker:
+every text swatch is legible on white, and every highlight swatch is pale enough to sit behind black
+text. That is a deliberate limit — a picker invites pale yellow on a white page, and a document
+nobody can read is not more expressive.
+
+**There is one Highlight control.** An earlier build had two — a plain yellow toggle in the
+Formatting row and the palette beside it — and two buttons with the same name doing different things
+is worse than one button that costs an extra click. Yellow is the first swatch.
+
+**Font size** offers Word's ladder (8 to 72pt) plus grow and shrink buttons. Both halves earn their
+place: the list is how you reach 24 in one action, the nudges are how you find the size that looks
+right without knowing its number.
+
+| Situation | Behaviour |
+|---|---|
+| Nothing selected has a size | The box shows the document's own size, not an empty field |
+| Grow, with no size set | Goes to 14 — the ladder is entered at the document's size, not at its bottom |
+| A document imported at 13pt | 13 is added to the list, so the box never shows a value the text is not |
+| Grow at 72, shrink at 8 | Stays there rather than running off the end |
+
+**Alignment** offers all four, justify included, and each button draws the shape it produces rather
+than the same glyph four times over.
+
+Size is stored as an attribute on the same `textStyle` mark that colour and font family use, not as
+a mark of its own. A coloured, sized, Georgia run is therefore one mark with three attributes, and
+the editor's schema does not grow — which is why the Markdown converters needed no change.
+
 ## Writing tools
 
 The editor's formatting has been Word-like since Phase 9. These are the things Word gives you for
@@ -669,11 +702,14 @@ DEPLOY.md               deployment guide
 - **A table cell holds inline text only.** GFM cannot express a list inside a cell, so cell content is
   flattened on export. This is the one place the converters knowingly lose structure, and it is why
   tables took their own phase rather than riding along with links.
-- **Colour, fonts and text alignment do not survive Markdown export.** They are supported in the
-  editor, and Markdown has no spelling for any of them — so the `.md` file omits them. This is a
-  deliberate trade rather than a bug, and the export dialog says so **before** you press the button;
+- **Colour, font size, fonts and text alignment do not survive Markdown export.** They are supported
+  in the editor, and Markdown has no spelling for any of them — so the `.md` file omits them. This is
+  a deliberate trade rather than a bug, and the export dialog says so **before** you press the button;
   **PDF keeps everything**, because it is the browser rendering what is on screen. The formatting is
   never lost from the document itself: TipTap JSON is the record of truth.
+- **A highlight survives Markdown export; its colour does not.** Different in kind from the line
+  above, and worth stating separately: the `<mark>` comes back, so a yellow and a pink highlight
+  return identical. The export warning names it.
 - **PDF export is the browser's print dialog**, so the browser chooses the filename and the output
   varies slightly between browsers. There is no server-side renderer.
 - **Sharing needs an existing account.** There are no pending invitations, so sharing with an address
@@ -787,12 +823,30 @@ Start the backend in a second terminal, then:
 cd frontend && npm run e2e
 ```
 
-Playwright starts the frontend dev server itself; the backend it does not, and every page behind the
+Playwright builds and starts the frontend itself — a production build, not `next dev`, so no route
+pays a first-request compile mid-test. The backend it does not start, and every page behind the
 guard calls it.
+
+Forgetting the backend does not produce an error that mentions the backend. Sign-up still works,
+because that is Supabase and the browser talks to it directly, and the dashboard shell still
+renders; only the document list fails. The failure arrives as a missing **New document** button.
+The page snapshot Playwright writes to `test-results/**/error-context.md` shows the real message,
+`Could not load your documents.`
+
+Run the suite through `npm run e2e` rather than `npx playwright test`: the script pins
+`PLAYWRIGHT_BROWSERS_PATH` to the browsers `npm run e2e:install` put in `.playwright-browsers/`.
+A machine with that variable already set globally — some tools set it to a shared cache — will
+otherwise fail with `Executable doesn't exist`.
 
 The timeouts are raised above Playwright's defaults on purpose: each protected page is server-rendered
 from a FastAPI call to a hosted database, and the App Router commits a URL only once the destination's
 payload has arrived, so a sign-in landing legitimately takes several seconds.
+
+One timeout is set *down* rather than up. Playwright gives actions no deadline by default, so
+`click()` on a selector that matches nothing does not fail — it waits until the whole test runs out,
+and then reports a test timeout, which reads as an application that has become slow rather than a
+selector that has gone stale. `actionTimeout` is 15s, matching the assertion timeout, so a stale
+selector says what it was waiting for while the reason is still obvious.
 
 Browsers download to `D:\AJAIA\Folium\.playwright-browsers`, not the system drive. The path is set
 inside the npm scripts, so it works in any shell without a machine-wide variable.

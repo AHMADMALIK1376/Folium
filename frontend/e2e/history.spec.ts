@@ -1,6 +1,27 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { signUp, uniqueEmail } from "./support/auth";
+
+/** The first entry in the version list.
+ *
+ * Addressed through the list's own label rather than through the author's name,
+ * which is where this used to point. The name is the local part of a generated
+ * address, so when the sign-up helper moved to e2e/support/auth.ts and the
+ * prefix went from "e2e-hist-" to "e2e-", the selector matched nothing.
+ *
+ * The failure that produced is worth remembering: a click with no match does
+ * not fail, it waits, and it waits on the test timeout rather than the
+ * assertion timeout. Both tests in this file sat for the full 180 seconds and
+ * then reported a timeout, which reads as an application that has got slow
+ * rather than a selector that has gone stale. It was diagnosed as the former
+ * for a while.
+ */
+function firstVersion(dialog: Locator) {
+  return dialog
+    .getByRole("list", { name: /earlier versions/i })
+    .getByRole("button")
+    .first();
+}
 
 async function typeInto(page: Page, text: string) {
   const body = page.getByRole("textbox", { name: /document body/i });
@@ -61,7 +82,7 @@ test("an earlier draft can be previewed and restored", async ({ browser }) => {
   await expect(dialog).toBeVisible();
 
   // Preview before restoring, so nobody restores blind.
-  await dialog.getByRole("button", { name: /e2e-hist/i }).first().click();
+  await firstVersion(dialog).click();
   await expect(dialog.getByText(/first draft by the owner/i)).toBeVisible();
 
   await dialog.getByRole("button", { name: /^restore$/i }).click();
@@ -126,7 +147,7 @@ test("a viewer can read the history but not restore", async ({ browser }) => {
   const dialog = guest.getByRole("dialog");
   await expect(dialog).toBeVisible();
 
-  await dialog.getByRole("button", { name: /e2e-hist/i }).first().click();
+  await firstVersion(dialog).click();
   await expect(dialog.getByText(/only draft/i)).toBeVisible();
   // Reading history is fine — they can already read the document. Restoring is
   // an edit, and the backend refuses it, so the control is not offered.

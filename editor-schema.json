@@ -71,7 +71,8 @@
     "tableHeader": "Rendered by its parent tableRow, never on its own."
   },
   "lossy": {
-    "textStyle": "Colour and font family. Markdown has no spelling for either.",
-    "textAlign": "An attribute on heading and paragraph. Markdown cannot express alignment at all."
+    "textStyle": "Colour, font size and font family. Markdown has no spelling for any of them.",
+    "textAlign": "An attribute on heading and paragraph. Markdown cannot express alignment at all.",
+    "highlight.color": "The mark itself exports as <mark> and survives; which colour it was does not, so a yellow and a pink highlight come back identical."
   }
 }

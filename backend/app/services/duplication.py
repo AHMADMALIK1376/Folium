@@ -73,8 +73,12 @@ async def duplicate(
     """Copy a document into the caller's account.
 
     Carried over: the title (prefixed "Copy of" unless `as_copy` is False, which
-    is how a template becomes a document under its own name), the content, and
-    the attachments.
+    is how a template becomes a document under its own name), the content, the
+    attachments, and the page setup.
+
+    Page setup travels because it is formatting, not organisation: a template
+    whose margins do not survive being used is a template that does not work.
+    It is the same reason the content comes along and the folder does not.
 
     Left behind, each for its own reason:
 
@@ -96,6 +100,7 @@ async def duplicate(
         # exist and their new ids are known.
         content=original.content,
         content_text=original.content_text,
+        page_setup=original.page_setup,
     )
     db.add(copy)
     # The copy needs an id before an attachment can point at it.

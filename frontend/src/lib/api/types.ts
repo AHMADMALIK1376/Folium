@@ -136,6 +136,22 @@ export interface DocumentDetail extends DocumentSummary {
    *  that would 503. */
   attachments_enabled: boolean;
   is_template: boolean;
+  /** null means never set up, so the editor applies its own defaults. Not the
+   *  same as a document deliberately set to A4: only one of those stays in
+   *  step if the default ever changes. */
+  page_setup: PageSetupWire | null;
+}
+
+/** How a document sits on paper, as the API spells it.
+ *
+ * Kept structurally identical to `PageSetup` in lib/editor/pageSetup.ts rather
+ * than imported from it: this is the wire shape the backend validates, and
+ * tying the two together would make a rename here look like a safe refactor.
+ */
+export interface PageSetupWire {
+  size: "a4" | "letter" | "legal";
+  orientation: "portrait" | "landscape";
+  margins: { top: number; right: number; bottom: number; left: number };
 }
 
 /** A file attached to a document.

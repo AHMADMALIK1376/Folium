@@ -28,6 +28,9 @@ EXCLUDED = SCHEMA["excluded"]
 LOSSY = SCHEMA["lossy"]
 
 NODE_SAMPLES: dict[str, dict] = {
+    # It stores nothing: the entries are read out of the document each time it
+    # renders. That is exactly why a bare marker round-trips it.
+    "tableOfContents": {"type": "tableOfContents"},
     "paragraph": {"type": "paragraph", "attrs": {"textAlign": None}, "content": [{"type": "text", "text": "Body"}]},
     "heading": {
         "type": "heading",
@@ -162,7 +165,11 @@ def _marked(name: str, attrs: dict | None = None) -> dict:
 
 
 # A link without an href is not a link, so the generic sample cannot cover it.
-MARK_ATTRS: dict[str, dict] = {"link": {"href": "https://example.com"}}
+# A bookmark without a name is not a bookmark either -- nothing can point at it.
+MARK_ATTRS: dict[str, dict] = {
+    "link": {"href": "https://example.com"},
+    "bookmark": {"name": "methods"},
+}
 
 MARK_SAMPLES: dict[str, dict] = {
     name: _marked(name, MARK_ATTRS.get(name)) for name in SCHEMA["marks"]
@@ -235,8 +242,14 @@ def test_every_mark_survives_a_round_trip(name):
 # "*important" carrying only bold — a character lost and a stray asterisk
 # gained, in the author's prose.
 
+# `bookmark` joins code and link here for the reason they are here: the generic
+# pair builder applies marks with no attributes, and a bookmark with no name is
+# not a bookmark any more than a link with no href is a link. Combining it is
+# covered explicitly below instead.
 COMBINABLE = [
-    name for name in SCHEMA["marks"] if name not in ("code", "link") and name not in LOSSY
+    name
+    for name in SCHEMA["marks"]
+    if name not in ("code", "link", "bookmark") and name not in LOSSY
 ]
 
 PAIRS = [(a, b) for i, a in enumerate(COMBINABLE) for b in COMBINABLE[i + 1 :]]
@@ -285,6 +298,119 @@ def test_three_marks_together_survive_a_round_trip():
 
     assert node["text"] == "important"
     assert {m["type"] for m in node.get("marks", [])} == {"bold", "italic", "underline"}
+
+
+def test_a_bookmark_can_also_be_bold():
+    """Naming a passage must not cost it its formatting.
+
+    The generic pair test cannot cover this — it builds marks without
+    attributes — so the combination is asserted here, the same way a bold link
+    is below.
+    """
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "important",
+                        "marks": [
+                            {"type": "bold"},
+                            {"type": "bookmark", "attrs": {"name": "methods"}},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+    [node] = markdown_to_doc(doc_to_markdown(original))["content"][0]["content"]
+
+    assert node["text"] == "important"
+    assert {m["type"] for m in node["marks"]} == {"bold", "bookmark"}
+    assert next(m for m in node["marks"] if m["type"] == "bookmark")["attrs"]["name"] == (
+        "methods"
+    )
+
+
+def test_an_unnamed_bookmark_keeps_its_words():
+    """The mark goes, the sentence stays.
+
+    Nothing can point at a bookmark with no name, so it is not one. Dropping the
+    author's text along with it would be a second fault on top of the first —
+    the same policy an unsafe link href gets.
+    """
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {"type": "text", "text": "still here", "marks": [{"type": "bookmark"}]}
+                ],
+            }
+        ],
+    }
+
+    [node] = markdown_to_doc(doc_to_markdown(original))["content"][0]["content"]
+
+    assert node["text"] == "still here"
+    assert "bookmark" not in {m["type"] for m in node.get("marks", [])}
+
+
+def test_a_cross_reference_is_just_a_link():
+    """The reason cross-references cost the schema nothing.
+
+    A reference to a bookmark is a link whose href is "#name". It needs no mark
+    of its own, and it already exports correctly, because that is what a link
+    does.
+    """
+    original = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "see Methods",
+                        "marks": [{"type": "link", "attrs": {"href": "#methods"}}],
+                    }
+                ],
+            }
+        ],
+    }
+
+    exported = doc_to_markdown(original)
+
+    assert "[see Methods](#methods)" in exported
+    assert markdown_to_doc(exported) == original
+
+
+def test_a_table_of_contents_round_trips_as_a_marker():
+    original = {
+        "type": "doc",
+        "content": [
+            {"type": "tableOfContents"},
+            {
+                "type": "paragraph",
+                "attrs": {"textAlign": None},
+                "content": [{"type": "text", "text": "After the contents"}],
+            },
+        ],
+    }
+
+    exported = doc_to_markdown(original)
+
+    # The marker markdown-toc already uses, so the file reads as ordinary
+    # Markdown to the tools people have.
+    assert "<!-- toc -->" in exported
+    assert markdown_to_doc(exported) == original
 
 
 def test_a_link_can_also_be_bold():

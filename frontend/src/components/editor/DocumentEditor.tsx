@@ -19,6 +19,13 @@ import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
 import { FormattingControls } from "@/components/editor/FormattingControls";
+import { InsertControls } from "@/components/editor/InsertControls";
+import { PageSetupControl } from "@/components/editor/PageSetupControl";
+import {
+  pageSetupCss,
+  withDefaults,
+  type PageSetup,
+} from "@/lib/editor/pageSetup";
 import { HistoryDialog } from "@/components/editor/HistoryDialog";
 import { SaveStatus } from "@/components/editor/SaveStatus";
 import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
@@ -90,6 +97,25 @@ function DocumentEditorSurface({
   );
   const { status, error, schedule, flush } = useAutosave({ save });
 
+  // Held in state as well as saved, so the page redraws as the setting changes
+  // rather than after the round trip. Seeded from the document, widened once
+  // here: null from the API means "never set up", and everything below wants a
+  // complete setup rather than a question.
+  const [pageSetup, setPageSetup] = useState<PageSetup>(() =>
+    withDefaults(document.page_setup),
+  );
+
+  const changePageSetup = useCallback(
+    (next: PageSetup) => {
+      setPageSetup(next);
+      // Through the same autosave as everything else, so it is debounced with
+      // the typing around it and flushed on unload by machinery that already
+      // works.
+      schedule({ page_setup: next });
+    },
+    [schedule],
+  );
+
   const editor = useEditor({
     extensions: [
       // Shared with editorSchema.test.ts, which asserts this schema matches
@@ -143,7 +169,10 @@ function DocumentEditorSurface({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: "folium-prose min-h-[60vh] px-6 py-5 outline-none",
+        // No padding of its own any more. The sheet around it carries the
+        // document's margins, and padding here would add to them -- an inch
+        // of margin plus a quarter of editor chrome is not an inch.
+        class: "folium-prose min-h-[40vh] outline-none",
         // ProseMirror sets only contenteditable, which confers no role of its
         // own — assistive technology and role-based test queries alike see a
         // plain div. Declaring textbox + aria-multiline is the documented
@@ -365,12 +394,35 @@ function DocumentEditorSurface({
 
       {editor && editable && <EditorToolbar editor={editor} documentId={document.id} />}
       {editor && editable && <FormattingControls editor={editor} />}
+      {editor && editable && <InsertControls editor={editor} />}
       {editor && editable && <TableControls editor={editor} />}
+      {editor && editable && (
+        <div
+          role="toolbar"
+          aria-label="Page"
+          data-print-hide
+          className="flex items-center gap-2 border-b border-neutral-200 px-2 py-1.5"
+        >
+          <PageSetupControl setup={pageSetup} onChange={changePageSetup} />
+        </div>
+      )}
       {/* Positioned relative so the menu can hang off the editor rather than the
           page, and rendered only for editors — everything it inserts is refused
           for a viewer anyway. */}
-      <div className="relative">
-        <EditorContent editor={editor} />
+      {/* The document's own page rules, injected rather than written in the
+          stylesheet: they differ per document, and @page in particular cannot
+          be parameterised any other way. It is also the only thing the
+          browser's print dialog obeys, so without this a PDF comes out on
+          whatever paper the printer defaults to. */}
+      <style>{pageSetupCss(pageSetup)}</style>
+
+      {/* Positioned relative so the menu can hang off the editor rather than the
+          page, and rendered only for editors — everything it inserts is refused
+          for a viewer anyway. */}
+      <div className="relative flex justify-center overflow-x-auto bg-neutral-100 py-6 print:block print:overflow-visible print:bg-transparent print:p-0">
+        <div className="folium-page bg-white shadow-md print:shadow-none">
+          <EditorContent editor={editor} />
+        </div>
         {editor && editable && <SlashMenu editor={editor} />}
       </div>
 

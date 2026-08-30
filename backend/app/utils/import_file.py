@@ -11,6 +11,11 @@ ITALIC_RE = re.compile(r"(?<!\\)(?<!\*)\*(?!\*)(.+?)(?<!\\)\*(?!\*)")
 QUOTE_RE = re.compile(r"^>\s?(.*)$")
 FENCE_RE = re.compile(r"^(`{3,})(.*)$")
 RULE_RE = re.compile(r"^(?:-{3,}|\*{3,}|_{3,})$")
+# The marker markdown-toc and its imitators already use, so a Folium export
+# reads as an ordinary Markdown file to the tools people already have. The node
+# stores nothing but "a contents list goes here", which is why a bare comment
+# carries all of it and the round trip is exact.
+TOC_RE = re.compile(r"^<!--\s*toc\s*-->$", re.IGNORECASE)
 # Checked before BULLET_RE, always: "- [ ] milk" also matches a bullet, whose
 # text would then be "[ ] milk" — a checklist quietly demoted to a list.
 TASK_RE = re.compile(r"^[-*]\s+\[([ xX])\]\s+(.*)$")
@@ -71,6 +76,11 @@ ESCAPED_RE = re.compile(r"\\([\\*#\-.`~>\[\]])")
 _INLINE_PATTERN = re.compile(
     r"(?P<code>(?<!\\)`(?P<code_text>[^`]+)`)"
     r"|(?P<link>(?<!\\)\[(?P<link_text>[^\]]*)\]\((?P<link_href>[^)]*)\))"
+    # An <a> carrying an id and no href: an anchor that goes nowhere and only
+    # names a place. Matched before the emphasis markers for the same reason
+    # <u> is -- it is HTML this module emits itself, and letting * matching
+    # pick it apart would corrupt it.
+    r"|(?P<bookmark><a id=\"(?P<bookmark_name>[^\"]*)\">(?P<bookmark_text>.+?)</a>)"
     r"|(?P<underline><u>(?P<underline_text>.+?)</u>)"
     r"|(?P<highlight><mark>(?P<highlight_text>.+?)</mark>)"
     r"|(?P<subscript><sub>(?P<subscript_text>.+?)</sub>)"
@@ -88,6 +98,7 @@ _INLINE_PATTERN = re.compile(
 _MARK_NAMES = (
     "code",
     "link",
+    "bookmark",
     "underline",
     "highlight",
     "subscript",
@@ -166,6 +177,21 @@ def _inline(text: str, marks: tuple[dict[str, Any], ...] = ()) -> list[dict[str,
                     # text as well would lose an author's sentence to a URL they
                     # may not even have written — a second bug on top of the one
                     # being prevented.
+                    nodes.extend(_inline(body, marks))
+
+            elif name == "bookmark":
+                bookmark = match.group("bookmark_name")
+                if bookmark:
+                    nodes.extend(
+                        _inline(
+                            body,
+                            (*marks, {"type": "bookmark", "attrs": {"name": bookmark}}),
+                        )
+                    )
+                else:
+                    # A bookmark without a name is not a bookmark -- nothing can
+                    # link to it. The mark goes, the words stay, exactly as for
+                    # an unsafe link href above.
                     nodes.extend(_inline(body, marks))
 
             elif name == "bolditalic":
@@ -396,6 +422,12 @@ def markdown_to_doc(md: str) -> dict[str, Any]:
             # An unsafe src drops to a paragraph below, keeping the author's
             # words rather than discarding the line — the same choice links make.
 
+        if TOC_RE.match(line):
+            close_list()
+            content.append({"type": "tableOfContents"})
+            index += 1
+            continue
+
         # Before the bullet rule, which would otherwise never see it — "---" has
         # no space after the dash — but before paragraphs, which would.
         if RULE_RE.match(line):
@@ -570,6 +602,16 @@ def _escape_line_start(line: str) -> str:
     return line
 
 
+def _bookmark_name_of(node: dict[str, Any]) -> str:
+    """The name on a node's bookmark mark, or "" if it has none."""
+    for mark in node.get("marks") or []:
+        if isinstance(mark, dict) and mark.get("type") == "bookmark":
+            attrs = mark.get("attrs")
+            if isinstance(attrs, dict):
+                return str(attrs.get("name") or "")
+    return ""
+
+
 def _href_of(node: dict[str, Any]) -> str:
     marks = node.get("marks")
     for mark in marks if isinstance(marks, list) else []:
@@ -642,6 +684,19 @@ def _inline_to_markdown(nodes: Any) -> str:
             text = f"<sub>{text}</sub>"
         if "superscript" in marks:
             text = f"<sup>{text}</sup>"
+
+        # Inside the link and outside everything else: a bookmark names the
+        # passage rather than styling it, so it wraps whatever styling is
+        # already there. An <a> with an id and no href is an anchor that goes
+        # nowhere, which is exactly what a bookmark is. A cross-reference TO one
+        # is an ordinary link to "#name" and needs nothing here at all.
+        if "bookmark" in marks:
+            bookmark = _bookmark_name_of(node)
+            # An unnamed bookmark is dropped and its words kept, for the same
+            # reason an unsafe href is: it is not a bookmark, and losing the
+            # author's sentence over it would be a second fault on top.
+            if bookmark:
+                text = f'<a id="{bookmark}">{text}</a>'
 
         # Outermost, and applied last rather than returning early — a link may
         # also be bold, and short-circuiting here dropped every other mark on it.
@@ -815,6 +870,12 @@ def doc_to_markdown(doc: dict[str, Any]) -> str:
 
         elif kind == "horizontalRule":
             chunks.append("---")
+
+        elif kind == "tableOfContents":
+            # The node holds nothing -- its entries are read out of the document
+            # every time it renders -- so a bare marker carries all of it and
+            # comes back as precisely itself.
+            chunks.append("<!-- toc -->")
 
         elif kind == "image":
             attrs = block.get("attrs")

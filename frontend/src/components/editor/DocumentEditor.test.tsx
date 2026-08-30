@@ -106,6 +106,7 @@ function makeDocument(
     // attachments panel. One test below turns it on.
     attachments_enabled: attachmentsEnabled,
     is_template: false,
+  page_setup: null,
     owner: {
       id: "u1",
       email: "owner@example.com",

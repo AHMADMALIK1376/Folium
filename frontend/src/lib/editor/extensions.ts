@@ -16,7 +16,9 @@ import TaskList from "@tiptap/extension-task-list";
 import Underline from "@tiptap/extension-underline";
 import StarterKit from "@tiptap/starter-kit";
 
+import { BookmarkMark } from "./bookmarks";
 import { FontSize } from "./fontSize";
+import { TableOfContents } from "./tableOfContents";
 
 /** The protocols a link may use.
  *
@@ -124,6 +126,12 @@ export function baseExtensions({ withHistory }: { withHistory: boolean }) {
     // Another attribute on textStyle rather than a mark of its own -- see the
     // note in fontSize.ts for why that distinction matters to the schema.
     FontSize,
+    // Names a passage so a link can point at it. A cross-reference is an
+    // ordinary link with a "#name" href, so it needs nothing of its own here.
+    BookmarkMark,
+    // Holds nothing: the entries are read out of the document every time it
+    // renders, which is why it round-trips as a bare "<!-- toc -->" marker.
+    TableOfContents,
     TextAlign.configure({
       // Headings and paragraphs only. Alignment on a list item or a table cell
       // is a different question with its own answers, and this is wide enough.

@@ -26,7 +26,7 @@
     "What must never happen is losing them SILENTLY, which is the exact bug",
     "shape that bit three times in Phase 6. So: the export dialog warns before",
     "writing a .md file that omits them, PDF export keeps all of it, and",
-    "test_editor_parity.py asserts each drops CLEANLY \u2014 the text survives and",
+    "test_editor_parity.py asserts each drops CLEANLY — the text survives and",
     "only the formatting goes."
   ],
   "nodes": [
@@ -44,6 +44,7 @@
     "table",
     "tableCell",
     "tableHeader",
+    "tableOfContents",
     "tableRow",
     "taskItem",
     "taskList",
@@ -51,6 +52,7 @@
   ],
   "marks": [
     "bold",
+    "bookmark",
     "code",
     "highlight",
     "italic",

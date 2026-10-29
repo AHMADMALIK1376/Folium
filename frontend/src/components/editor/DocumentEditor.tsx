@@ -17,6 +17,8 @@ import { DocumentStats } from "@/components/editor/DocumentStats";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
+import { PublishDialog } from "@/components/editor/PublishDialog";
+import { PublishedNote } from "@/components/editor/PublishedNote";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
 import { FormattingControls } from "@/components/editor/FormattingControls";
 import { InsertControls } from "@/components/editor/InsertControls";
@@ -76,6 +78,8 @@ function DocumentEditorSurface({
   const [openComment, setOpenComment] = useState<string | null>(null);
   // Raised by Ctrl+F and by the Find button. Held here because both need it.
   const [finding, setFinding] = useState(false);
+  // Bumped after a publish so the last-published line re-reads itself.
+  const [publishedTick, setPublishedTick] = useState(0);
 
   const save = useCallback(
     async (patch: DocumentPatch, init?: RequestInit) => {
@@ -310,6 +314,15 @@ function DocumentEditorSurface({
         {/* Offered whatever the permission: exporting is reading. */}
         <ExportDialog documentId={document.id} content={editor?.getJSON()} />
 
+        {/* Owners and editors, and only where the deployment has a GitHub
+            token; the dialog decides both, and the backend decides again. */}
+        <PublishDialog
+          documentId={document.id}
+          permission={document.permission}
+          content={editor?.getJSON()}
+          onPublished={() => setPublishedTick((n) => n + 1)}
+        />
+
         {/* A visible way in. Ctrl+F is the shortcut people already have, but
             it is the browser's shortcut being taken over — nobody would guess
             this app has its own unless it says so. */}
@@ -347,6 +360,10 @@ function DocumentEditorSurface({
             <ShareDialog documentId={document.id} />
           </>
         )}
+      </div>
+
+      <div data-print-hide className="px-4 pt-2 empty:hidden">
+        <PublishedNote documentId={document.id} refreshKey={publishedTick} />
       </div>
 
       {!editable && (

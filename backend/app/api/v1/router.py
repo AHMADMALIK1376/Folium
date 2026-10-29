@@ -6,8 +6,10 @@ from app.api.v1 import (
     comments,
     documents,
     export,
+    features,
     folders,
     notifications,
+    publish,
     search,
     shares,
     stars,
@@ -34,3 +36,5 @@ api_router.include_router(collab.router)
 api_router.include_router(export.router)
 api_router.include_router(attachments.router)
 api_router.include_router(comments.router)
+api_router.include_router(publish.router)
+api_router.include_router(features.router)

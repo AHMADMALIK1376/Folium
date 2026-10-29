@@ -41,6 +41,17 @@ class Document(Base):
     # and footers arrive. NULL means never set up, so the editor applies its own
     # defaults rather than the row asserting a page size nobody chose.
     page_setup: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Where this document was last published in the GitHub repo (Phase 22), and
+    # the blob sha GitHub gave back. The sha is how a later publish tells
+    # "nobody touched the file" from "someone edited it in GitHub".
+    github_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    last_published_blob_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_published_by: Mapped[uuid.UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -9,9 +9,13 @@ share them with other people.
 > stored as TipTap JSON, sharing with permission levels, soft delete with a trash folder, file
 > import and export, version history with restore, attachments, and live collaborative editing.
 >
-> Two features are optional and configuration-gated, by design rather than by omission: **live
-> collaboration** needs a y-sweet server, and **attachments** need a Supabase Storage bucket and a
-> service-role key. Without either, the rest of the app is unchanged — without y-sweet the editor
+> **Folium is for design documents only. Do not store patient or personal health data in it.** It is
+> hosted outside the country where Curavine's patients live, which is acceptable for design work and
+> not for health data. The app says so on the sign-up page and in a banner on every page.
+>
+> Three features are optional and configuration-gated, by design rather than by omission: **live
+> collaboration** needs a y-sweet server, **attachments** need a Supabase Storage bucket and a
+> service-role key, and **publishing to GitHub** needs a token (below). Without either, the rest of the app is unchanged — without y-sweet the editor
 > falls back to single-user autosave, and two people editing at once overwrite each other, which is
 > what version history exists to rescue.
 
@@ -52,6 +56,7 @@ share them with other people.
 | [19](docs/superpowers/specs/2026-08-30-phase-19-rich-formatting-design.md) | A colour palette, font size, and justify | Done |
 | [20](docs/superpowers/specs/2026-08-30-phase-20-page-setup-design.md) | A real page: size, orientation and margins | Done |
 | [21](docs/superpowers/specs/2026-08-30-phase-21-insert-design.md) | Insert: symbols, dates, bookmarks, cross-references, contents | Done |
+| [22](docs/superpowers/specs/2026-10-29-phase-22-publish-to-github-design.md) | Publish a document to GitHub as Markdown; a features endpoint; a data notice | Done |
 
 See the [foundation design spec](docs/superpowers/specs/2026-07-25-folium-foundation-design.md) for
 the full v2 design.
@@ -259,6 +264,40 @@ header, toolbar, status indicators, dialogs, and collaboration cursors all disap
 title and the document on a white page that breaks between blocks rather than through a heading.
 
 Exporting a specific version from history is not supported; history restores in place instead.
+
+## Publish to GitHub
+
+Design documents are written here and read by the team's Claude from a private GitHub repository.
+**Publish to GitHub**, beside Export, converts the document to Markdown (the same converter as Export)
+and commits it through the GitHub Contents API.
+
+- **Who:** the owner and anyone with *edit* permission. Viewers and commenters do not see the button,
+  and the backend refuses them with 403 regardless. Anyone who can open the document sees *Last
+  published ... by ...* on it.
+- **Where:** the first publish asks for a path in the repository, pre-filled from the title
+  (`docs/tech-stack.md`). It is saved on the document, so later publishes go to the same file; change
+  it and the next publish goes to a new file.
+- **What:** a small YAML header (`folium_document_id`, `title`, `published_at`, `published_by`,
+  `folium_version_id`) followed by the Markdown. The commit message is `Publish: <title> (by <name>)`.
+  Formatting Markdown cannot carry is warned about in the dialog, as with Export.
+- **A snapshot, not a mirror:** edits after publishing reach GitHub only on the next publish.
+- **Conflicts:** Folium remembers the blob sha GitHub returned. If the file there is different on the
+  next publish -- someone edited it in GitHub, or a file you never published already sits at that
+  path -- nothing is written and the dialog offers **Cancel** or **Overwrite**.
+- **History:** every publish is recorded in a `publications` table (who, which path, which commit).
+
+Set `GITHUB_TOKEN` (a fine-grained token with *Contents: read/write* on one repository),
+`GITHUB_REPO` (`owner/name`), and optionally `GITHUB_BRANCH` and `GITHUB_BASE_PATH` in the backend
+environment -- see [DEPLOY.md](DEPLOY.md). The token never leaves the backend. Without it the button
+is hidden and the endpoint answers 503.
+
+`GET /api/v1/features` reports, as booleans only, whether collaboration, attachments and GitHub
+publishing are configured. The editor uses it to say so when live editing is off ("edits by two
+people at the same time can overwrite each other") or attachments are unavailable, instead of
+silently falling back.
+
+Publishing a whole folder at once is not built: it needs a path scheme per document and honest
+reporting of partial failure, and is better done as its own phase.
 
 ## Attachments
 

@@ -520,3 +520,22 @@ async def test_features_reports_booleans_only(client, github, alice_email):
 
 async def test_features_requires_sign_in(client):
     assert (await client.get("/api/v1/features")).status_code == 401
+
+
+async def test_features_follow_the_settings(client, alice_email, monkeypatch):
+    monkeypatch.setattr(settings, "y_sweet_connection_string", "")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "")
+    monkeypatch.setattr(settings, "github_token", SecretStr(""))
+    monkeypatch.setattr(settings, "github_repo", "")
+    off = (await client.get("/api/v1/features", headers=auth_headers(alice_email))).json()
+
+    monkeypatch.setattr(settings, "y_sweet_connection_string", "ys://secret-token@host")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "service-role-secret")
+    monkeypatch.setattr(settings, "github_token", SecretStr(TOKEN))
+    monkeypatch.setattr(settings, "github_repo", REPO)
+    response = await client.get("/api/v1/features", headers=auth_headers(alice_email))
+
+    assert off == {"collaboration": False, "attachments": False, "github_publish": False}
+    assert response.json() == {"collaboration": True, "attachments": True, "github_publish": True}
+    for secret in ("secret-token", "service-role-secret", TOKEN):
+        assert secret not in response.text

@@ -17,6 +17,7 @@ import { DocumentStats } from "@/components/editor/DocumentStats";
 import { ConnectionStatus } from "@/components/editor/ConnectionStatus";
 import { EditorToolbar } from "@/components/editor/EditorToolbar";
 import { ExportDialog } from "@/components/editor/ExportDialog";
+import { AttachmentsOffNote, CollaborationOffNote } from "@/components/editor/FeatureNotes";
 import { PublishDialog } from "@/components/editor/PublishDialog";
 import { PublishedNote } from "@/components/editor/PublishedNote";
 import { FindReplaceBar } from "@/components/editor/FindReplaceBar";
@@ -362,8 +363,9 @@ function DocumentEditorSurface({
         )}
       </div>
 
-      <div data-print-hide className="px-4 pt-2 empty:hidden">
+      <div data-print-hide className="grid gap-2 px-4 pt-2 empty:hidden">
         <PublishedNote documentId={document.id} refreshKey={publishedTick} />
+        <CollaborationOffNote editable={editable} />
       </div>
 
       {!editable && (
@@ -448,8 +450,14 @@ function DocumentEditorSurface({
       {/* Absent entirely when the deployment has no storage key, rather than an
           empty state or an error: an unconfigured feature is not a broken one,
           and the same is true of collaboration's indicator above. */}
-      {document.attachments_enabled && (
+      {document.attachments_enabled ? (
         <AttachmentsPanel documentId={document.id} canEdit={editable} />
+      ) : (
+        // Said rather than silent: a missing panel looks like a missing feature,
+        // and the team needs to know it is a setting.
+        <div className="px-4 pb-3">
+          <AttachmentsOffNote enabled={false} />
+        </div>
       )}
 
       {/* Shown at every permission level, including view: reading a discussion

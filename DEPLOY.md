@@ -72,7 +72,21 @@ Set up Supabase first — both other services need its credentials.
    ```
    Y_SWEET_CONNECTION_STRING=<y-sweet connection string>   # live collaboration
    SUPABASE_SERVICE_ROLE_KEY=<service_role key>            # attachments
+   GITHUB_TOKEN=<fine-grained token>                       # publish to GitHub
+   GITHUB_REPO=<owner/name>
+   GITHUB_BRANCH=main                                      # optional, default main
+   GITHUB_BASE_PATH=<folder>                               # optional
    ```
+
+   **On the GitHub token.** Publishing commits Markdown to a private repository through the GitHub
+   Contents API. Create the token at GitHub -> Settings -> Developer settings -> Personal access
+   tokens -> *Fine-grained tokens*: set **Repository access** to *Only select repositories* and pick
+   the one docs repository, and under **Repository permissions** grant **Contents: Read and write**
+   and nothing else. Prefer a dedicated bot or team account over one person's, and set an expiry
+   you will remember: when it lapses, publishing answers "Folium's GitHub token was rejected" and
+   nothing else breaks. Backend only -- it is never sent to the browser, returned by an API or
+   logged, and must never be a `NEXT_PUBLIC_*` variable. A malformed `GITHUB_REPO` stops the
+   service starting, rather than failing at the first publish.
 
    **On the service-role key.** It bypasses row-level security and is the most dangerous value in
    the deployment, so it is worth being explicit about why it is here. Attachments are stored in a
@@ -124,6 +138,9 @@ production.
 4. Share it with a second account; confirm that account sees it under documents shared with them.
 5. Sign in as a third account and request the document id directly — expect **404**, not 403.
 6. Open the same document in two browsers and confirm live cursors (Phase 4 onward).
+7. With GitHub configured, publish a document as its owner and confirm the commit appears in the
+   repository; as a viewer, confirm there is no Publish button. `GET /api/v1/features` (signed in)
+   reports which optional features the deployment has on.
 
 Step 5 is the important one: it is the test that protects real users' private documents.
 

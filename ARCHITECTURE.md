@@ -136,15 +136,26 @@ from.
 
 ## The data model, and what changed
 
-Ten tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
-`document_stars`, `folders`, `comments`, `notifications` and `comment_mentions` — the last five
-added in Phases 8, 13, 14 and 15. The full DDL is in the spec. The changes that matter:
+Eleven tables: `users`, `documents`, `document_shares`, `document_versions`, `attachments`,
+`document_stars`, `folders`, `comments`, `notifications`, `comment_mentions` and `publications` —
+the last six added in Phases 8, 13, 14, 15 and 22. The full DDL is in the spec. The changes that matter:
 
 **`content` becomes `jsonb` instead of an HTML string.** The most consequential change. v1 stores
 rendered HTML; TipTap's native format is JSON, with HTML as one possible export. Storing JSON means
 never parsing HTML to manipulate a document, makes content queryable, and is required by the
 collaboration service, which operates on structured nodes. Staying on HTML would actively obstruct
 real-time editing.
+
+**Publishing to GitHub (Phase 22)** adds four columns to `documents` -- `github_path`,
+`last_published_blob_sha`, `last_published_at`, `last_published_by` -- and an append-only
+`publications` log. The blob sha is the whole conflict mechanism: GitHub is the second writer of a
+published file, so before each publish `services/publishing.py` reads the file's current sha and
+compares it with the one recorded at the last publish. A mismatch is a 409 the person must
+acknowledge (Overwrite), and GitHub's own sha check on the write closes the race between looking and
+writing. The GitHub token lives only in backend settings (a `SecretStr`), is used only to build an
+Authorization header, and GitHub's response bodies are never forwarded to callers. Failures map to
+our own statuses: 502 for a rejected token or missing repo (never 401/404, which the frontend would
+read as an expired session or a missing document), 504 for a timeout, 503 when unconfigured.
 
 **A `permission` column on shares** — view / comment / edit, replacing v1's binary access. The
 middle level was inert until Phase 14, when comments gave it something to do.

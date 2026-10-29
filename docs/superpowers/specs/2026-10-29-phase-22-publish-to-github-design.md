@@ -1,7 +1,7 @@
 # Folium Phase 22 — Publish to GitHub
 
 **Date:** 2026-10-29
-**Status:** Proposed
+**Status:** Implemented
 **Scope:** Publish a document to a GitHub repository as Markdown; a features endpoint; a data notice.
 
 ---
@@ -60,8 +60,9 @@ so existence is not leaked, and anyone reaching the check can already open the d
 6. Record: update the four document columns and insert a `publications` row, in one transaction.
 7. Return `{path, commit_sha, commit_url, blob_sha, published_at, published_by}`.
 
-Conflict body: `{"code": "remote_changed", "detail": "This file was changed in GitHub since the last publish."}`
-so the dialog can offer Cancel / Overwrite without parsing prose.
+Conflict response: status 409 with `{"detail": "This file was changed in GitHub since the last publish."}`.
+The frontend's `ApiError` carries only status and a string detail, and 409 is unambiguous on this
+endpoint, so the dialog keys on the status rather than on a separate error code.
 
 ### 2.4 Paths
 
@@ -69,7 +70,7 @@ Pre-filled from `safe_filename(title)` (reused, not duplicated) under `docs/`. A
 `/`-separated, each segment non-empty, no `.` / `..` / `.git` segment, no backslash or control
 characters, no leading `/`, length ≤ 240, must end in `.md`. Unicode is allowed — `safe_filename`
 keeps Urdu letters and GitHub stores them — but each segment is percent-encoded when building the
-API URL. Anything else is 422 from a Pydantic validator.
+API URL. Anything else is a 422 with a one-sentence `detail`, raised by the service rather than a Pydantic validator, whose failures arrive as a list the dialog cannot show.
 
 ### 2.5 The file
 

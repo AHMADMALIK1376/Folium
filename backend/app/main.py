@@ -15,6 +15,7 @@ from app.core.exceptions import (
     ValidationError,
 )
 from app.services.collab import CollabUnavailableError
+from app.services.publishing import PublishingError
 from app.services.storage import StorageUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,13 @@ async def handle_storage_unavailable(
         status_code=503,
         content={"detail": "Attachments are temporarily unavailable"},
     )
+
+
+@app.exception_handler(PublishingError)
+async def handle_publishing(request: Request, exc: PublishingError) -> JSONResponse:
+    # The service already chose the status and wrote the message in our own
+    # words; nothing from GitHub's response is forwarded.
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
 @app.exception_handler(Exception)

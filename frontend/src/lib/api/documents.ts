@@ -11,6 +11,8 @@ import type {
   Folder,
   GrantablePermission,
   PageSetupWire,
+  PublishResult,
+  PublishStatus,
   SearchResults,
   Share,
   TipTapDoc,
@@ -426,4 +428,22 @@ export function duplicateDocument(id: string, asCopy = true): Promise<DocumentDe
     `/api/v1/documents/${id}/duplicate?as_copy=${asCopy}`,
     { method: "POST" },
   );
+}
+
+/** Where a document publishes to, and when it last did. */
+export function getPublishStatus(id: string): Promise<PublishStatus> {
+  return apiFetch<PublishStatus>(`/api/v1/documents/${id}/publish`);
+}
+
+/** Commit the document to GitHub. A 409 means the file changed in GitHub since
+ *  the last publish; retry with `overwrite: true` only after asking. */
+export function publishDocument(
+  id: string,
+  path: string,
+  overwrite = false,
+): Promise<PublishResult> {
+  return apiFetch<PublishResult>(`/api/v1/documents/${id}/publish`, {
+    method: "POST",
+    body: JSON.stringify({ path, overwrite }),
+  });
 }

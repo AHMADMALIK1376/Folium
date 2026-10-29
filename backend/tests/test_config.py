@@ -100,3 +100,38 @@ def test_whitespace_is_not_a_service_role_key():
         _env_file=None, supabase_url="https://abc.supabase.co", supabase_service_role_key="   "
     )
     assert s.attachments_enabled is False
+
+
+def test_github_publishing_is_off_by_default():
+    assert Settings(_env_file=None).github_publish_enabled is False
+
+
+def test_github_publishing_needs_token_and_repo():
+    assert Settings(_env_file=None, github_token="t").github_publish_enabled is False
+    assert Settings(_env_file=None, github_repo="a/b").github_publish_enabled is False
+    on = Settings(_env_file=None, github_token="t", github_repo="a/b")
+    assert on.github_publish_enabled is True
+    assert on.github_branch == "main"
+
+
+def test_github_repo_must_be_owner_slash_name():
+    import pytest
+
+    for bad in ("justname", "a/b/c", "a b/c", "/b", "a/"):
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, github_repo=bad)
+
+
+def test_github_base_path_is_normalised_and_safe():
+    import pytest
+
+    assert Settings(_env_file=None, github_base_path="/docs/design/").github_base_path == "docs/design"
+    for bad in ("../x", "a/../b", ".git/x"):
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, github_base_path=bad)
+
+
+def test_the_github_token_is_redacted_when_settings_are_printed():
+    s = Settings(_env_file=None, github_token="ghp_supersecret", github_repo="a/b")
+    assert "ghp_supersecret" not in repr(s)
+    assert "ghp_supersecret" not in str(s)

@@ -3,6 +3,7 @@ from app.models.comment import Comment
 from app.models.document import Document
 from app.models.folder import Folder
 from app.models.notification import CommentMention, Notification
+from app.models.publication import Publication
 from app.models.share import DocumentShare
 from app.models.star import DocumentStar
 from app.models.user import User
@@ -18,5 +19,6 @@ __all__ = [
     "DocumentVersion",
     "Folder",
     "Notification",
+    "Publication",
     "User",
 ]

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { DataNoticeBanner } from "@/components/DataNotice";
 import { Logo } from "@/components/Logo";
 import { Sidebar } from "@/components/Sidebar";
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -30,6 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* One guard for every page behind the auth boundary: a bfcache restore
           must not paint the previous session's documents. */}
       <StaleSessionGuard />
+      <DataNoticeBanner />
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-[1600px] items-center justify-between px-6 py-3">
           <Link href="/dashboard" className="rounded-sm hover:opacity-80">

@@ -1,4 +1,9 @@
+import re
+
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9._-]+$")
 
 
 class Settings(BaseSettings):
@@ -59,6 +64,54 @@ class Settings(BaseSettings):
     # deployment that has not configured this is not broken, and CI needs no
     # vendor to run the suite.
     y_sweet_connection_string: str = ""
+
+    # Publishing documents to GitHub as Markdown (Phase 22).
+    #
+    # A fine-grained personal access token with Contents: read/write on ONE
+    # repository. Held as a SecretStr so that printing the settings object, or a
+    # traceback that includes it, shows asterisks. Backend only: nothing here is
+    # served to the browser, and there is deliberately no NEXT_PUBLIC_ twin.
+    #
+    # Blank means publishing is off -- the routes answer 503 and the editor
+    # omits the button -- exactly as for collaboration and attachments.
+    github_token: SecretStr = SecretStr("")
+    # "owner/name". Validated at startup so a typo fails the deploy, not the
+    # first person to press Publish.
+    github_repo: str = ""
+    github_branch: str = "main"
+    # Optional folder inside the repo that every published path sits under.
+    github_base_path: str = ""
+
+    @field_validator("github_repo")
+    @classmethod
+    def _repo_shape(cls, v: str) -> str:
+        v = v.strip()
+        if v and not _REPO_RE.match(v):
+            raise ValueError("GITHUB_REPO must look like owner/name")
+        return v
+
+    @field_validator("github_branch")
+    @classmethod
+    def _branch_shape(cls, v: str) -> str:
+        v = v.strip() or "main"
+        if ".." in v or v.startswith(("/", "-")) or any(c.isspace() or c in "~^:?*[\\" for c in v):
+            raise ValueError("GITHUB_BRANCH is not a valid branch name")
+        return v
+
+    @field_validator("github_base_path")
+    @classmethod
+    def _base_path_shape(cls, v: str) -> str:
+        v = v.strip().strip("/")
+        if not v:
+            return ""
+        parts = v.split("/")
+        if any(p in ("", ".", "..", ".git") or "\\" in p for p in parts):
+            raise ValueError("GITHUB_BASE_PATH must be a plain relative folder")
+        return v
+
+    @property
+    def github_publish_enabled(self) -> bool:
+        return bool(self.github_token.get_secret_value().strip() and self.github_repo)
 
     @property
     def is_development(self) -> bool:

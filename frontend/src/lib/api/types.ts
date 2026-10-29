@@ -247,3 +247,39 @@ export interface AppNotification {
   read_at: string | null;
   created_at: string;
 }
+
+/** Which optional features this deployment has switched on. Booleans only. */
+export interface Features {
+  collaboration: boolean;
+  attachments: boolean;
+  github_publish: boolean;
+}
+
+export interface Publisher {
+  id: string;
+  display_name: string;
+}
+
+/** What the publish dialog needs to know about a document. */
+export interface PublishStatus {
+  configured: boolean;
+  can_publish: boolean;
+  repo: string | null;
+  branch: string | null;
+  /** The saved path, else a suggestion made from the title. */
+  path: string;
+  is_published: boolean;
+  last_published_at: string | null;
+  last_published_by: Publisher | null;
+  file_url: string | null;
+}
+
+export interface PublishResult {
+  path: string;
+  commit_sha: string;
+  commit_url: string;
+  file_url: string;
+  blob_sha: string;
+  published_at: string;
+  published_by: Publisher;
+}
